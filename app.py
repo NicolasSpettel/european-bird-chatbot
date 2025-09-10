@@ -14,59 +14,36 @@ def home():
 
 @app.route('/ask', methods=['POST'])
 def ask():
+    print("=== NEW REQUEST ===")
     print("Received request:", request.json)
     user_input = request.json.get('message')
     print("User input:", user_input)
     
-    # Debug: Get raw agent response first
-    raw_agent_response = bird_agent.agent.invoke({"input": user_input})
-    print("Raw agent response:", raw_agent_response)
-    
-    response = bird_agent.ask(user_input)
-    print("Processed agent response:", response)
-    
-    # Parse the nested response format
-    actual_response = "No response"
-    actual_image = None
-    
-    if isinstance(response, dict) and 'answer' in response:
-        answer_str = response['answer']
-        print(f"Answer string: {answer_str}")
+    try:
+        # Get the response from bird agent
+        response = bird_agent.ask(user_input)
+        print("Bird agent response:", response)
         
-        # Look for images in the original response dict
-        if 'images' in response and response['images']:
-            actual_image = response['images'][0]
-            print(f"Found image in response['images']: {actual_image}")
+        # Extract the actual answer and image
+        actual_response = response.get('answer', 'No response available')
+        actual_images = response.get('images', [])
+        actual_image = actual_images[0] if actual_images else None
         
-        # Try to parse if it's a string representation of a dict
-        try:
-            import ast
-            import re
-            
-            if answer_str.startswith("{'") and answer_str.endswith("'}"):
-                parsed = ast.literal_eval(answer_str)
-                actual_response = parsed.get('response', answer_str)
-                if not actual_image:
-                    actual_image = parsed.get('image_url', None)
-            else:
-                actual_response = answer_str
-                # Extract URL from plain text if present
-                if not actual_image:
-                    url_match = re.search(r'https://[^\s\'")}]+\.(jpg|jpeg|png|gif)', answer_str)
-                    if url_match:
-                        actual_image = url_match.group(0)
-                        print(f"Extracted image from text: {actual_image}")
-        except Exception as e:
-            print(f"Parse error: {e}")
-            actual_response = answer_str
-    
-    print(f"Final response: {actual_response}")
-    print(f"Final image: {actual_image}")
-    
-    return jsonify({
-        'response': actual_response,
-        'image_url': actual_image
-    })
+        print(f"Final response: {actual_response}")
+        print(f"Final image: {actual_image}")
+        print("=== END REQUEST ===")
+        
+        return jsonify({
+            'response': actual_response,
+            'image_url': actual_image
+        })
+        
+    except Exception as e:
+        print(f"Error in Flask route: {e}")
+        return jsonify({
+            'response': 'Sorry, I encountered an error processing your request.',
+            'image_url': None
+        }), 500
 
 @app.route('/ask_audio', methods=['POST'])
 def ask_audio():

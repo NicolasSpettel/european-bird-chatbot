@@ -65,6 +65,8 @@ class BirdQueryTool(BaseTool):
 
     def _run(self, query: str) -> str:
         try:
+            logger.info(f"BirdQueryTool searching for: {query}")
+            
             results = self.chroma_client.search(
                 collection_name="birds",
                 query=query,
@@ -78,14 +80,34 @@ class BirdQueryTool(BaseTool):
                 species = metadata.get('species', 'Unknown')
                 image_url = metadata.get('thumbnail', '')
                 
-                formatted_output = f'{{"species": "{species}", "description": "{doc[:500]}", "image_url": "{image_url}"}}'
+                # Ensure we always return valid JSON
+                result_data = {
+                    "species": species,
+                    "description": doc[:500] if doc else "No description available.",
+                    "image_url": image_url if image_url else ""
+                }
+                
+                formatted_output = json.dumps(result_data)
+                logger.info(f"BirdQueryTool returning: {formatted_output}")
                 return formatted_output
             else:
-                return f"I couldn't find specific information about '{query}'. Try asking about a common European bird."
+                # Return JSON even for no results
+                result_data = {
+                    "species": "Unknown",
+                    "description": f"I couldn't find specific information about '{query}'. Try asking about a common European bird.",
+                    "image_url": ""
+                }
+                return json.dumps(result_data)
         
         except Exception as e:
             logger.error(f"Bird query failed: {e}")
-            return f"I encountered an error searching for '{query}'. Please try rephrasing your question."
+            # Return JSON even for errors
+            result_data = {
+                "species": "Error",
+                "description": f"I encountered an error searching for '{query}'. Please try rephrasing your question.",
+                "image_url": ""
+            }
+            return json.dumps(result_data)
 
 class YouTubeQueryTool(BaseTool):
     """Tool for searching YouTube video transcripts for birdwatching information."""
@@ -236,15 +258,21 @@ class BirdQAAgent:
         - Equipment, habitats, behavior ("binoculars", "bird behavior")
         - General questions ("getting started with birdwatching")
 
-    **Response Format:**
-    - For **bird queries**: Provide a detailed description of the bird based on the `description` from the tool's JSON output. DO NOT include the image URL in your final answer text.
+    **Response Format - CRITICAL:**
+    - For **bird queries**: When you receive JSON from bird_query tool, ALWAYS return ONLY the JSON as your final answer. Do NOT modify it, do NOT add markdown, do NOT include image URLs in text.
     - For **YouTube queries**: Extract the `summary` from the tool output and present it conversationally. Then add: "I found this from {video_count} videos. You can watch more at: [first URL]"
+
+    **IMPORTANT:** 
+    - When bird_query returns JSON like {"species": "...", "description": "...", "image_url": "..."}, return EXACTLY that JSON
+    - Do NOT create markdown images like ![Bird](url) 
+    - Do NOT include image URLs in the description text
+    - Let the frontend handle image display
 
     **Examples:**
     User: "birding community" -> Use youtube_query (NOT bird_query)
-    User: "robin bird" -> Use bird_query 
+    User: "robin bird" -> Use bird_query -> Return the exact JSON from the tool
     User: "birdwatching tips" -> Use youtube_query
-    User: "what is a sparrow" -> Use bird_query""")
+    User: "what is a sparrow" -> Use bird_query -> Return the exact JSON from the tool""")
         
         try:
             self.agent = initialize_agent(
@@ -378,16 +406,23 @@ class BirdQAAgent:
                     # If parsing fails, use the response as is
                     answer = response
             else:
-                # Plain text response
+                # Plain text response - check for markdown images
                 answer = response
                 
-                # Try to extract any image URLs from plain text
+                # Try to extract markdown images first ![alt](url)
                 import re
-                url_match = re.search(r'https?://[^\s\'")}]+\.(jpg|jpeg|png|gif)', response)
-                if url_match:
-                    images.append(url_match.group(0))
-                    # Remove the URL from the answer text
-                    answer = response.replace(url_match.group(0), "").strip()
+                markdown_match = re.search(r'!\[([^\]]*)\]\((https?://[^\s\)]+\.(jpg|jpeg|png|gif)[^\)]*)\)', response)
+                if markdown_match:
+                    images.append(markdown_match.group(2))  # group(2) is the URL
+                    # Remove the markdown image from the answer text
+                    answer = response.replace(markdown_match.group(0), "").strip()
+                else:
+                    # Try to extract plain image URLs
+                    url_match = re.search(r'https?://[^\s\'")}]+\.(jpg|jpeg|png|gif)', response)
+                    if url_match:
+                        images.append(url_match.group(0))
+                        # Remove the URL from the answer text
+                        answer = response.replace(url_match.group(0), "").strip()
 
             return {
                 "answer": answer,
