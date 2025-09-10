@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot with Image</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/4/47/Numida_meleagris_-Kruger_National_Park,_South_Africa-8a.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+        }
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+            z-index: -1;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-left-color: #ffffff;
+            animation: spin 1s ease infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen p-4">
+
+    <div class="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-8 w-full max-w-7xl">
+
+        <div class="flex-shrink-0 w-full md:w-64 h-[calc(100vh-8rem)] bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Example Queries</h3>
+            <ul id="example-queries" class="space-y-2">
+                <li>
+                    <button class="w-full text-left p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200 text-sm">
+                        What is a Ring Ouzel?
+                    </button>
+                </li>
+                <li>
+                    <button class="w-full text-left p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200 text-sm">
+                        Tell me about the European Robin.
+                    </button>
+                </li>
+                <li>
+                    <button class="w-full text-left p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200 text-sm">
+                        Where can I find a European Golden Oriole?
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="flex-1 flex flex-col h-[calc(100vh-8rem)] w-full bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="p-4 bg-white border-b border-gray-200 shadow-sm">
+                <h1 class="text-xl font-bold text-gray-800 text-center">European Birds QA Bot</h1>
+            </div>
+
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
+                <div class="flex items-start justify-start">
+                    <div class="bg-gray-100 text-gray-800 p-4 rounded-xl max-w-[80%] whitespace-pre-wrap break-all bot-message">
+                        <span>Hello Bird Friend! I am here to talk to you about Europes birds.</span>
+                        <button class="tts-btn text-gray-500 hover:text-gray-700 transition duration-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.666a3.84 3.84 0 0 1 .494 2.859M15.474 19.462a3.84 3.84 0 0 1-2.858-.494m-2.147-3.666a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m3.666 2.147a3.84 3.84 0 0 1 .494 2.859m-2.858.494a3.84 3.84 0 0 1-.494 2.859m-4.846 3.666a3.84 3.84 0 0 1-2.859-.494m-3.666-2.147a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-200 p-4 bg-gray-50 flex items-center space-x-4">
+                <input type="text" id="user-input" placeholder="Type your message..." class="flex-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+                <input type="file" id="audio-input" accept="audio/wav" class="hidden">
+                <button id="audio-upload-btn" class="bg-gray-300 text-gray-700 p-3 rounded-xl font-medium shadow-md hover:bg-gray-400 transition duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75V21m-6.75-6.75h13.5M19.5 12a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
+                    </svg>
+                </button>
+                <button id="send-btn" class="bg-blue-600 text-white p-3 rounded-xl font-medium shadow-md hover:bg-blue-700 transition duration-200 flex items-center justify-center">
+                    <span id="send-btn-text">Send</span>
+                    <div id="loading-spinner" class="spinner ml-2"></div>
+                </button>
+            </div>
+        </div>
+
+        <div id="image-container" class="flex-shrink-0 w-full md:w-80 h-[calc(100vh-8rem)] bg-gray-200 rounded-xl shadow-lg flex items-center justify-center text-gray-500 text-center p-4">
+            <span class="p-4 rounded-md bg-white/50 backdrop-blur-md">
+                Wikipedia Image Placeholder
+            </span>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const sendBtnText = document.getElementById('send-btn-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const imageContainer = document.getElementById('image-container');
+        const exampleQueries = document.getElementById('example-queries');
+        const audioUploadBtn = document.getElementById('audio-upload-btn');
+        const audioInput = document.getElementById('audio-input');
+
+        const apiKey = ""; // You need to set your API key here.
+        const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+        const base64ToArrayBuffer = (base64) => {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        };
+
+        const pcmToWav = (pcmData, sampleRate) => {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+            const blockAlign = numChannels * bitsPerSample / 8;
+
+            const buffer = new ArrayBuffer(44 + pcmData.byteLength);
+            const view = new DataView(buffer);
+
+            const writeString = (str) => {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(i, str.charCodeAt(i));
+                }
+            };
+
+            writeString('RIFF');
+            view.setUint32(4, 36 + pcmData.byteLength, true);
+            writeString('WAVE');
+
+            writeString('fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+
+            writeString('data');
+            view.setUint32(40, pcmData.byteLength, true);
+            
+            const pcmBytes = new Uint8Array(pcmData);
+            for (let i = 0; i < pcmData.byteLength; i++) {
+                view.setUint8(44 + i, pcmBytes[i]);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        };
+        
+        const addMessage = (text, sender, transcription = null) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', 'mb-4');
+
+            let contentHTML = `<span>${text}</span>`;
+            if (transcription) {
+                contentHTML = `<strong>(Transcription)</strong><br>${contentHTML}`;
+            }
+
+            if (sender === 'user') {
+                messageDiv.classList.add('justify-end');
+                messageDiv.innerHTML = `<div class="bg-blue-500 text-white p-4 rounded-xl max-w-[80%] break-words">${contentHTML}</div>`;
+            } else {
+                messageDiv.classList.add('justify-start');
+                messageDiv.innerHTML = `<div class="bg-gray-100 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words">
+                                            <span>${contentHTML}</span>
+                                            <button class="tts-btn text-gray-500 hover:text-gray-700 transition duration-200">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.666a3.84 3.84 0 0 1 .494 2.859M15.474 19.462a3.84 3.84 0 0 1-2.858-.494m-2.147-3.666a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m3.666 2.147a3.84 3.84 0 0 1 .494 2.859m-2.858.494a3.84 3.84 0 0 1-.494 2.859m-4.846 3.666a3.84 3.84 0 0 1-2.859-.494m-3.666-2.147a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859"/>
+                                                </svg>
+                                            </button>
+                                        </div>`;
+            }
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        };
+
+        const displayImage = (imageUrl) => {
+            imageContainer.innerHTML = '';
+
+            if (imageUrl) {
+                const imgElement = document.createElement('img');
+                imgElement.src = imageUrl;
+                imgElement.alt = "Wikipedia Image";
+                imgElement.classList.add(
+                    'w-full',        // take full width
+                    'h-auto',        // keep natural aspect ratio
+                    'object-contain',// scale but don’t crop
+                    'rounded-xl',
+                    'shadow'         // small shadow for clarity
+                );
+                imageContainer.appendChild(imgElement);
+            } else {
+                imageContainer.innerHTML = `
+                    <span class="p-4 text-gray-600 rounded-md bg-white/50 backdrop-blur-md">
+                        Wikipedia Image Placeholder
+                    </span>
+                `;
+            }
+        };
+
+
+        const showLoading = () => {
+            sendBtnText.textContent = '...';
+            loadingSpinner.style.display = 'block';
+            sendBtn.disabled = true;
+            userInput.disabled = true;
+            audioUploadBtn.disabled = true;
+        };
+
+        const hideLoading = () => {
+            sendBtnText.textContent = 'Send';
+            loadingSpinner.style.display = 'none';
+            sendBtn.disabled = false;
+            userInput.disabled = false;
+            audioUploadBtn.disabled = false;
+        };
+
+        const sendMessage = async () => {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            userInput.value = '';
+            showLoading();
+
+            try {
+                const response = await fetch('http://localhost:5000/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                hideLoading();
+
+                addMessage(data.response, 'bot');
+                displayImage(data.image_url);
+
+            } catch (error) {
+                console.error('Error fetching bot response:', error);
+                hideLoading();
+                addMessage("Sorry, I couldn't connect to the server. Please check your backend.", 'bot');
+            }
+        };
+        
+        const sendAudio = async (file) => {
+            const formData = new FormData();
+            formData.append('audio', file, file.name);
+
+            addMessage('Uploading audio...', 'user');
+            showLoading();
+
+            try {
+                const response = await fetch('http://localhost:5000/ask_audio', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                hideLoading();
+
+                if (data.transcription) {
+                    const lastUserMessage = chatMessages.querySelector('.justify-end:last-child');
+                    if (lastUserMessage) {
+                        lastUserMessage.innerHTML = `<div class="bg-blue-500 text-white p-4 rounded-xl max-w-[80%]"><strong>(Transcription)</strong><br>${data.transcription}</div>`;
+                    }
+                }
+                addMessage(data.response, 'bot');
+                displayImage(data.image_url);
+                
+            } catch (error) {
+                console.error('Error processing audio:', error);
+                hideLoading();
+                addMessage("Sorry, I couldn't process the audio. Please try again.", 'bot');
+            }
+        };
+
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        exampleQueries.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON') {
+                userInput.value = event.target.textContent.trim();
+                sendMessage();
+            }
+        });
+
+        audioUploadBtn.addEventListener('click', () => {
+            audioInput.click();
+        });
+
+        audioInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                sendAudio(file);
+            }
+        });
+
+        chatMessages.addEventListener('click', async (event) => {
+            const ttsButton = event.target.closest('.tts-btn');
+            if (ttsButton) {
+                const messageSpan = ttsButton.parentElement.querySelector('span');
+                const messageText = messageSpan.textContent.trim();
+                const originalSvg = ttsButton.innerHTML;
+
+                ttsButton.disabled = true;
+                ttsButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 animate-spin">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181-3.181m0 0l-3.181-3.182m-4.992 0h-4.991v-.001M16.023 19.644h4.992v-.001m-4.991 0l-3.181 3.181m-3.182-3.181-3.181-3.181"/>
+                                        </svg>`;
+                
+                try {
+                    const payload = {
+                        contents: [{
+                            parts: [{ text: messageText }]
+                        }],
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: { voiceName: "Kore" }
+                                }
+                            }
+                        },
+                        model: "gemini-2.5-flash-preview-tts"
+                    };
+
+                    const response = await fetch(ttsUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                    const mimeType = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType;
+
+                    if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                        const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                        if (sampleRateMatch) {
+                            const sampleRate = parseInt(sampleRateMatch[1], 10);
+                            const pcmData = base64ToArrayBuffer(audioData);
+                            const wavBlob = pcmToWav(pcmData, sampleRate);
+                            const audioUrl = URL.createObjectURL(wavBlob);
+                            const audio = new Audio(audioUrl);
+                            audio.play();
+
+                            audio.onended = () => {
+                                ttsButton.disabled = false;
+                                ttsButton.innerHTML = originalSvg;
+                            };
+                            audio.onerror = () => {
+                                console.error("Audio playback failed.");
+                                ttsButton.disabled = false;
+                                ttsButton.innerHTML = originalSvg;
+                            };
+                        }
+                    } else {
+                        throw new Error("Invalid audio data from API");
+                    }
+                } catch (error) {
+                    console.error('Error with TTS:', error);
+                    ttsButton.disabled = false;
+                    ttsButton.innerHTML = originalSvg;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

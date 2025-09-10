@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional, Union
 import re
 import logging
 import os
+import json
 
 from langchain.agents import initialize_agent, AgentType
 from langchain.memory import ConversationBufferWindowMemory
@@ -98,7 +99,7 @@ class YouTubeQueryTool(BaseTool):
 
     def _summarize_content(self, documents: List[str], metadatas: List[dict], original_query: str) -> str:
         """Summarize multiple document excerpts into a coherent response"""
-        combined_content = "\n\n".join([f"Video: {meta.get('title', 'Unknown')}\nContent: {doc[:300]}" 
+        combined_content = "\n\n".join([f"Video: {meta.get('title', 'Unknown')}\nContent: {doc[:500]}" 
                                        for doc, meta in zip(documents, metadatas)])
         
         summary_prompt = f"""
@@ -227,23 +228,23 @@ class BirdQAAgent:
         """Initialize the LangChain agent"""
         system_message = SystemMessage(content="""You are a European bird expert and guide. Your role is to help users with birdwatching questions.
 
-**CRITICAL Tool Selection Rules:**
-1. Use `bird_query` ONLY for questions about SPECIFIC BIRD SPECIES (e.g., "tell me about robins", "what does a sparrow look like")
-2. Use `youtube_query` for ALL OTHER birdwatching topics including:
-   - Communities, groups, clubs ("birding community", "birdwatching groups")  
-   - Tips, techniques, guides ("birdwatching tips", "how to identify birds")
-   - Equipment, habitats, behavior ("binoculars", "bird behavior")
-   - General questions ("getting started with birdwatching")
+    **CRITICAL Tool Selection Rules:**
+    1. Use `bird_query` ONLY for questions about SPECIFIC BIRD SPECIES (e.g., "tell me about robins", "what does a sparrow look like")
+    2. Use `youtube_query` for ALL OTHER birdwatching topics including:
+        - Communities, groups, clubs ("birding community", "birdwatching groups") 
+        - Tips, techniques, guides ("birdwatching tips", "how to identify birds")
+        - Equipment, habitats, behavior ("binoculars", "bird behavior")
+        - General questions ("getting started with birdwatching")
 
-**Response Format:**
-- For **bird queries**: Provide a detailed description of the bird and include the image URL at the end as: `Image: [URL]`
-- For **YouTube queries**: Extract the `summary` from the tool output and present it conversationally. Then add: "I found this from {video_count} videos. You can watch more at: [first URL]"
+    **Response Format:**
+    - For **bird queries**: Provide a detailed description of the bird based on the `description` from the tool's JSON output. DO NOT include the image URL in your final answer text.
+    - For **YouTube queries**: Extract the `summary` from the tool output and present it conversationally. Then add: "I found this from {video_count} videos. You can watch more at: [first URL]"
 
-**Examples:**
-User: "birding community" → Use youtube_query (NOT bird_query)
-User: "robin bird" → Use bird_query  
-User: "birdwatching tips" → Use youtube_query
-User: "what is a sparrow" → Use bird_query""")
+    **Examples:**
+    User: "birding community" -> Use youtube_query (NOT bird_query)
+    User: "robin bird" -> Use bird_query 
+    User: "birdwatching tips" -> Use youtube_query
+    User: "what is a sparrow" -> Use bird_query""")
         
         try:
             self.agent = initialize_agent(
@@ -319,46 +320,34 @@ User: "what is a sparrow" → Use bird_query""")
                 "error": True
             }
     
+    import json, re
+
     def ask(self, question: str, input_type: str = "text") -> Dict[str, Any]:
-        """Ask the agent a question and return a structured response"""
         try:
             if not self.agent:
-                return {
-                    "answer": "Agent not properly initialized.",
-                    "images": [],
-                    "error": True
-                }
-            
-            metadata = {"input_type": input_type, "question_length": len(question)}
-            
-            response = self.agent.invoke(
-                {"input": question},
-                config={"metadata": metadata} if self.langsmith_client else None
-            )['output']
-            
-            # Extract image URL from response
-            match = re.search(r'Image:\s*(https?://\S+)', response)
-            
+                return {"answer": "Agent not properly initialized.", "images": [], "error": True}
+
+            response = self.agent.invoke({"input": question})['output']
+            answer = response
             images = []
-            if match:
-                images.append(match.group(1))
-                answer = response.replace(match.group(0), "").strip()
-            else:
-                answer = response
-            
-            return {
-                "answer": answer,
-                "images": images,
-                "error": False
-            }
-            
+
+            try:
+                data = json.loads(response)  # This is failing
+                if "image_url" in data:
+                    images.append(data["image_url"])
+                if "description" in data:
+                    answer = data["description"]
+            except json.JSONDecodeError:
+                match = re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', response)
+                if match:
+                    images.append(match.group(0))
+                    answer = response.replace(match.group(0), "").strip()
+
+            return {"answer": answer, "images": images, "error": False}
+
         except Exception as e:
             logger.error(f"Error processing question: {e}")
-            return {
-                "answer": f"I encountered an error processing your question: {str(e)}",
-                "images": [],
-                "error": True
-            }
+            return {"answer": f"Error: {str(e)}", "images": [], "error": True}
     
     def get_conversation_history(self) -> List[Dict]:
         """Get conversation history"""
