@@ -1,0 +1,97 @@
+Evaluation Report
+---------------------
+
+Quality Score Calculation: The quality score is a custom metric that averages four checks: response length, keyword relevance, and the presence of category-specific keywords (e.g., image links for bird facts or 'YouTube' for tips).
+
+✅ indicates a correct tool usage, while ❌ indicates a wrong tool usage
+
+Question: tell me about robins (Expected Tool: bird_query)
+Bot's Answer: The European robin, known simply as the robin or robin redbreast, is a small insectivorous passerine bird found across Europe, east to Western Siberia, and south to North Africa. It is sedentary in the west and south of its range, and migratory in the north and east where winters are harsher. Here is an image of a European robin: ![European Robin](https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Erithacus_rubecula_with_cocked_head.jpg/330px-Erithacus_rubecula_with_cocked_head.jpg)
+✅ tell me about robins
+   Tool: bird_query | Quality: 0.75 | Time: 3.25s
+--------------------
+
+Question: what does a sparrow look like (Expected Tool: bird_query)
+Bot's Answer: The house sparrow, a species of bird, is found in most parts of the world. It is a small bird with a typical length of 16 cm and a mass of 24–39.5 g. Females and young birds are colored pale brown and grey, while males have brighter black, white, and brown markings. It is one of about 25 species in the genus Passer.
+✅ what does a sparrow look like
+   Tool: bird_query | Quality: 0.54 | Time: 2.20s
+--------------------
+
+Question: european eagle description (Expected Tool: bird_query)
+Bot's Answer: The European eagle you mentioned is likely referring to the White-tailed eagle, also known as the 'sea eagle'. It is a large bird of prey widely distributed across temperate Eurasia. Like all eagles, it is a member of the family Accipitridae. One of up to eleven members in the genus Haliaeetus, it is commonly called the white-tailed sea-eagle.
+✅ european eagle description
+   Tool: bird_query | Quality: 0.67 | Time: 2.85s
+--------------------
+
+Question: what is a blue jay's habitat (Expected Tool: bird_query)
+Bot's Answer: The Blue Jay is a passerine bird native to North America. It is known for its striking blue plumage with white and black markings. Blue Jays are often found in forests, woodlands, and residential areas, where they build nests in trees. They are omnivorous birds, feeding on a variety of seeds, nuts, fruits, and insects.
+✅ what is a blue jay's habitat
+   Tool: bird_query | Quality: 0.62 | Time: 2.25s
+--------------------
+
+Question: what do flamingos eat (Expected Tool: bird_query)
+Bot's Answer: Flamingos primarily eat algae, crustaceans, and small fish. Their diet is rich in carotenoid pigments, which give them their distinctive pink color.
+❌ what do flamingos eat
+   Tool: bird_query | Quality: 0.38 | Time: 0.89s
+--------------------
+
+Question: tell me about the common starling (Expected Tool: bird_query)
+Bot's Answer: The common starling, also known simply as the starling in Great Britain and Ireland, and as European starling in North America, is a medium-sized passerine bird in the starling family, Sturnidae. It is about 20 cm (8 in) long and has glossy black plumage with a metallic sheen, which is speckled with white at some times of the year. The legs are pink and the bill is black in winter and yellow in summer; young birds have browne. Here is an image of a Common Starling: ![Common Starling](https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Toulouse_-_Sturnus_vulgaris_-_2012-02-26_-_3.jpg/330px-Toulouse_-_Sturnus_vulgaris_-_2012-02-26_-_3.jpg)
+✅ tell me about the common starling
+   Tool: bird_query | Quality: 0.67 | Time: 3.04s
+--------------------
+
+Question: how big is a hummingbird (Expected Tool: bird_query)
+Bot's Answer: Hummingbirds are small birds, typically measuring around 7.5 to 13 cm (3 to 5 inches) in length.
+✅ how big is a hummingbird
+   Tool: bird_query | Quality: 0.50 | Time: 1.03s
+--------------------
+
+Question: birding community (Expected Tool: youtube_query)
+Bot's Answer: Birdwatching communities are a great resource for beginners to connect with like-minded individuals and learn from experienced birders. Look for local bird walks or nature centers that offer guided tours or group activities. Additionally, using apps like eBird can help you track bird sightings and discover new species in your area. Remember to go birding during the early morning or late afternoon when birds are most active for the best chance of spotting them. Happy birdwatching!
+✅ birding community
+   Tool: youtube_query | Quality: 0.62 | Time: 5.03s
+--------------------
+
+Question: birdwatching tips for beginners (Expected Tool: youtube_query)
+Bot's Answer: If you're just starting out in birdwatching, here are some key tips to help you succeed. First, try birding in the early morning or late afternoon when birds are most active. Use birding apps to help with identification and behavior patterns. Join online communities like Discord or Facebook groups to connect with other birders and learn from their experiences. And most importantly, practice and be patient to improve your bird identification skills over time. Happy birdwatching!
+✅ birdwatching tips for beginners
+   Tool: youtube_query | Quality: 0.56 | Time: 3.96s
+--------------------
+
+Question: how to identify birds (Expected Tool: youtube_query)
+Bot's Answer: If you're looking to improve your bird identification skills while birdwatching, here are some key tips to keep in mind. Firstly, never stop learning about birds - there are plenty of free resources available to expand your knowledge. Additionally, utilizing tools like bird identification apps can help you accurately identify birds, whether through sound recordings or photos. Lastly, timing is key - try birdwatching in the early morning or late afternoon when birds are most active and easier to spot. Happy birdwatching!
+✅ how to identify birds
+   Tool: youtube_query | Quality: 0.46 | Time: 4.77s
+--------------------
+
+Question: best binoculars for birdwatching (Expected Tool: youtube_query)
+Bot's Answer: When it comes to choosing the best binoculars for birdwatching, remember that magnification is key. Opt for binoculars with a magnification range of 7x to 12x to get a clear and detailed image of the birds. You don't necessarily need expensive gear to enjoy birdwatching, so focus on finding binoculars that suit your preferences and budget. Happy birdwatching!
+✅ best binoculars for birdwatching
+   Tool: youtube_query | Quality: 0.44 | Time: 4.05s
+--------------------
+
+Question: bird behavior patterns (Expected Tool: youtube_query)
+Bot's Answer: Bird behavior patterns are crucial to understanding birdwatching. One important aspect is learning bird sounds, as different birds have distinct calls. Starting with a few common sounds can help beginners identify birds more easily. Additionally, listening to podcasts or exploring resources like the American Birding Association can provide valuable information on bird behavior that may not be found elsewhere. As you venture into birdwatching, observing and learning about bird behavior patterns will enhance your experience and help you become a better birder over time.
+✅ bird behavior patterns
+   Tool: youtube_query | Quality: 0.25 | Time: 3.94s
+--------------------
+
+Question: how to attract birds to my garden (Expected Tool: youtube_query)
+Bot's Answer: To attract birds to your garden, start by providing food, water, and shelter. Setting up bird feeders with a variety of seeds and nuts can entice different species. Keep the feeders clean and well-stocked. Also, consider adding bird baths or shallow dishes of water for drinking and bathing. Planting native trees, shrubs, and flowers can create natural cover and nesting spots for birds. Additionally, playing bird songs or calls can help attract them to your garden. Remember to be patient and observant, as birds may take some time to discover and trust your garden as a safe space.
+❌ how to attract birds to my garden
+   Tool: youtube_query | Quality: 0.17 | Time: 4.81s
+--------------------
+
+Question: what bird calls sound like a wolf (Expected Tool: youtube_query)
+Bot's Answer: If you're out birdwatching and hear a bird call that sounds like a wolf, don't be alarmed! Some birds, like the Eastern Screech Owl, have calls that can resemble a wolf's howl. Keep an eye out for field marks and behaviors to help you identify the bird making the sound. Remember to birdwatch in the early morning or late afternoon when birds are most active and use apps to enhance your birding experience. Happy birdwatching!
+✅ what bird calls sound like a wolf
+   Tool: youtube_query | Quality: 0.64 | Time: 7.15s
+--------------------
+
+Question: best bird feeders (Expected Tool: youtube_query)
+Bot's Answer: When selecting bird feeders, consider factors like size, material, and design. Tube feeders are versatile and attract a variety of birds, while platform feeders are great for larger birds. Suet feeders are ideal for attracting woodpeckers and other insect-eating birds. Choose feeders that are easy to clean and refill, and position them in a safe and visible location for the birds.
+❌ best bird feeders
+   Tool: youtube_query | Quality: 0.42 | Time: 1.29s
+--------------------
+

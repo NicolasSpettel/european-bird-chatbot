@@ -16,18 +16,58 @@ from src.tools.audio_processor import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
+class QueryExpander:
+    """Utility class to expand queries into multiple variations"""
+    
+    def __init__(self, llm: ChatOpenAI):
+        self.llm = llm
+    
+    def expand_query(self, original_query: str) -> List[str]:
+        """Expand a single query into 3 different variations"""
+        expansion_prompt = f"""
+        Given this birdwatching query: "{original_query}"
+        
+        Generate 3 different but related search queries that would help find comprehensive information:
+        1. A more specific/detailed version
+        2. A broader/general version  
+        3. A practical/technique-focused version
+        
+        Return only the 3 queries, one per line, no numbering or extra text.
+        Example:
+        bird identification techniques
+        birdwatching guide for beginners  
+        how to identify birds by behavior
+        """
+        
+        try:
+            response = self.llm.invoke(expansion_prompt)
+            queries = [q.strip() for q in response.content.strip().split('\n') if q.strip()]
+            expanded = queries[:3] if len(queries) >= 3 else [original_query] * 3
+            logger.info(f"Expanded '{original_query}' into: {expanded}")
+            return expanded
+        except Exception as e:
+            logger.error(f"Query expansion failed: {e}")
+            # Fallback to manual expansion
+            return [
+                original_query,
+                f"{original_query} tips techniques",
+                f"beginner guide {original_query}"
+            ]
+
 class BirdQueryTool(BaseTool):
     """Tool for searching and retrieving comprehensive information and images for European birds."""
     name: str = "bird_query"
-    description: str = "A comprehensive tool for finding detailed descriptions and image URLs for European birds. Input should be a bird name, description, or question about a bird. This tool provides all available information in a single output."
+    description: str = """Use this tool ONLY when the user asks about a SPECIFIC BIRD SPECIES by name (e.g., 'robin', 'eagle', 'sparrow'). 
+    This tool provides detailed descriptions and images of European birds. 
+    DO NOT use for general birdwatching topics, communities, tips, or techniques."""
     chroma_client: ChromaClient
 
     def _run(self, query: str) -> str:
         try:
-            results = self.chroma_client.search_birds(
-                collection_name="bird_descriptions",
+            results = self.chroma_client.search(
+                collection_name="birds",
                 query=query,
-                n_results=1
+                n_results=3
             )
             
             if results and results['documents'] and results['documents'][0]:
@@ -37,7 +77,6 @@ class BirdQueryTool(BaseTool):
                 species = metadata.get('species', 'Unknown')
                 image_url = metadata.get('thumbnail', '')
                 
-                # Return a JSON-like string
                 formatted_output = f'{{"species": "{species}", "description": "{doc[:500]}", "image_url": "{image_url}"}}'
                 return formatted_output
             else:
@@ -46,6 +85,93 @@ class BirdQueryTool(BaseTool):
         except Exception as e:
             logger.error(f"Bird query failed: {e}")
             return f"I encountered an error searching for '{query}'. Please try rephrasing your question."
+
+class YouTubeQueryTool(BaseTool):
+    """Tool for searching YouTube video transcripts for birdwatching information."""
+    name: str = "youtube_query"
+    description: str = """Use this tool for general birdwatching topics like: tips, techniques, communities, guides, equipment, 
+    identification methods, habitats, behavior, or any non-specific bird questions. 
+    Input should be a query related to birdwatching topics (NOT specific bird species)."""
+    chroma_client: ChromaClient
+    llm: ChatOpenAI
+    query_expander: QueryExpander
+
+    def _summarize_content(self, documents: List[str], metadatas: List[dict], original_query: str) -> str:
+        """Summarize multiple document excerpts into a coherent response"""
+        combined_content = "\n\n".join([f"Video: {meta.get('title', 'Unknown')}\nContent: {doc[:300]}" 
+                                       for doc, meta in zip(documents, metadatas)])
+        
+        summary_prompt = f"""
+        Based on these YouTube video excerpts about birdwatching, provide a comprehensive and conversational summary that answers: "{original_query}"
+        
+        Video Content:
+        {combined_content}
+        
+        Instructions:
+        - Synthesize information from all videos, don't just copy text
+        - Make it conversational and helpful
+        - Focus on practical advice and key insights
+        - If videos mention specific techniques or tips, explain them clearly
+        - Keep it informative but concise (2-4 sentences)
+        - Don't mention "based on videos" - just provide the information naturally
+        """
+        
+        try:
+            response = self.llm.invoke(summary_prompt)
+            return response.content.strip()
+        except Exception as e:
+            logger.error(f"Summarization failed: {e}")
+            return f"I found information from {len(documents)} videos but had trouble summarizing it."
+
+    def _run(self, query: str) -> str:
+        try:
+            # Expand the query into multiple variations
+            expanded_queries = self.query_expander.expand_query(query)
+            
+            all_documents = []
+            all_metadatas = []
+            seen_titles = set()
+            
+            # Search with each expanded query
+            for expanded_query in expanded_queries:
+                results = self.chroma_client.search(
+                    collection_name="youtube",
+                    query=expanded_query,
+                    n_results=2
+                )
+                
+                if results and results['documents'] and results['documents'][0]:
+                    for doc, metadata in zip(results['documents'][0], results['metadatas'][0]):
+                        title = metadata.get('title', 'Unknown')
+                        if title not in seen_titles:
+                            all_documents.append(doc)
+                            all_metadatas.append(metadata)
+                            seen_titles.add(title)
+            
+            if not all_documents:
+                return f"I couldn't find YouTube content about '{query}'."
+            
+            # Use top 3 most relevant documents
+            documents_to_use = all_documents[:3]
+            metadatas_to_use = all_metadatas[:3]
+            
+            # Generate summary
+            summary = self._summarize_content(documents_to_use, metadatas_to_use, query)
+            
+            # Include video URLs for reference
+            video_urls = [meta.get('url', '') for meta in metadatas_to_use if meta.get('url')]
+            
+            result = {
+                "summary": summary,
+                "video_count": len(documents_to_use),
+                "video_urls": video_urls[:2]
+            }
+            
+            return str(result)
+            
+        except Exception as e:
+            logger.error(f"YouTube query failed: {e}")
+            return f"I encountered an error searching for '{query}' on YouTube."
 
 class BirdQAAgent:
     """Main Bird Q&A Agent with audio support and LangSmith tracking"""
@@ -71,6 +197,9 @@ class BirdQAAgent:
             temperature=Config.TEMPERATURE,
             openai_api_key=Config.OPENAI_API_KEY
         )
+        
+        self.query_expander = QueryExpander(self.llm)
+        
         self.memory = ConversationBufferWindowMemory(
             memory_key="chat_history",
             return_messages=True,
@@ -86,29 +215,35 @@ class BirdQAAgent:
         """Initialize tools for the agent"""
         self.tools = [
             BirdQueryTool(chroma_client=self.chroma_client),
+            YouTubeQueryTool(
+                chroma_client=self.chroma_client, 
+                llm=self.llm,
+                query_expander=self.query_expander
+            ),
         ]
         logger.info(f"Initialized {len(self.tools)} tools")
     
     def setup_agent(self):
         """Initialize the LangChain agent"""
-        system_message = SystemMessage(content="""You are a European bird expert and guide. Your role is to:
+        system_message = SystemMessage(content="""You are a European bird expert and guide. Your role is to help users with birdwatching questions.
 
-**Work Process:**
-1. Use the `bird_query` tool for any user question about a bird.
-2. The tool's output will contain all necessary information, including the official species name, a description, and an image URL if available.
-3. **Final Response:** Based on the tool's output, create a final, conversational answer. Start with the description, and at the very end, include the image URL on a new line in the format: `Image: [URL]`.
+**CRITICAL Tool Selection Rules:**
+1. Use `bird_query` ONLY for questions about SPECIFIC BIRD SPECIES (e.g., "tell me about robins", "what does a sparrow look like")
+2. Use `youtube_query` for ALL OTHER birdwatching topics including:
+   - Communities, groups, clubs ("birding community", "birdwatching groups")  
+   - Tips, techniques, guides ("birdwatching tips", "how to identify birds")
+   - Equipment, habitats, behavior ("binoculars", "bird behavior")
+   - General questions ("getting started with birdwatching")
 
-**Tool Rules:**
-- `bird_query`: The only tool you have. Use it to retrieve both information and an image URL.
-                                       
-**Example Conversation Flow:**
-Human: Tell me about the European Robin.
-You: I'll search for information about the European Robin.
-(Agent uses BirdQueryTool)
-You: The European Robin is a small passerine bird... (detailed description from search result)... Image: https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Erithacus_rubecula_with_cocked_head.jpg/330px-Erithacus_rubecula_with_cocked_head.jpg
+**Response Format:**
+- For **bird queries**: Provide a detailed description of the bird and include the image URL at the end as: `Image: [URL]`
+- For **YouTube queries**: Extract the `summary` from the tool output and present it conversationally. Then add: "I found this from {video_count} videos. You can watch more at: [first URL]"
 
-Remember: You specialize in European birds. If asked about non-European species, politely redirect to European alternatives.
-""")
+**Examples:**
+User: "birding community" → Use youtube_query (NOT bird_query)
+User: "robin bird" → Use bird_query  
+User: "birdwatching tips" → Use youtube_query
+User: "what is a sparrow" → Use bird_query""")
         
         try:
             self.agent = initialize_agent(
@@ -129,7 +264,6 @@ Remember: You specialize in European birds. If asked about non-European species,
     def process_audio_query(self, audio_file_path: str) -> Dict[str, Any]:
         """Process audio input and return response"""
         try:
-            # Transcribe audio to text
             transcribed_text = self.audio_processor.transcribe_audio(audio_file_path)
             
             if not transcribed_text:
@@ -142,7 +276,6 @@ Remember: You specialize in European birds. If asked about non-European species,
             
             logger.info(f"Transcribed audio: {transcribed_text}")
             
-            # Process the transcribed text as a normal query
             result = self.ask(transcribed_text)
             result["transcription"] = transcribed_text
             
@@ -196,7 +329,6 @@ Remember: You specialize in European birds. If asked about non-European species,
                     "error": True
                 }
             
-            # Track the query type in LangSmith
             metadata = {"input_type": input_type, "question_length": len(question)}
             
             response = self.agent.invoke(

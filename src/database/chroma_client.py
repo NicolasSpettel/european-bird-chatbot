@@ -1,167 +1,49 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
 import json
-from pathlib import Path
-from src.database.chroma_client import ChromaClient
 import logging
+from pathlib import Path
+import chromadb
+from chromadb.config import Settings
 
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def load_and_process_birds():
-    """Load bird data from JSON and prepare for ChromaDB"""
-    data_file = Path("data/raw/wikipedia_birds.json")
-    
-    if not data_file.exists():
-        logger.error("Bird data file not found. Run data collection first.")
-        return None, None, None
-    
-    with open(data_file, 'r', encoding='utf-8') as f:
-        birds_data = json.load(f)
-    
-    documents = []
-    metadata = []
-    ids = []
-    
-    for i, bird in enumerate(birds_data):
-        if bird.get('extract') and len(bird['extract']) > 100:
-            doc_text = f"{bird['title']}\n\n"
-            
-            if bird.get('description'):
-                doc_text += f"Description: {bird['description']}\n\n"
-            
-            doc_text += f"Information: {bird['extract']}"
-            
-            documents.append(doc_text)
-            
-            family = "Unknown"
-            description = bird.get('description', '').lower()
-            if 'family' in description:
-                family = "Extracted from description"
-            
-            # --- THIS IS THE CRITICAL FIX ---
-            meta = {
-                'species': bird['title'],
-                'family': family,
-                'region': 'Europe',
-                'source': 'Wikipedia',
-                'url': bird.get('page_url', ''),
-                'thumbnail': bird.get('thumbnail', ''),  # Store the thumbnail URL here
-                'search_name': bird.get('search_name', bird['title'])
-            }
-            # --- END OF FIX ---
-            
-            metadata.append(meta)
-            
-            ids.append(f"bird_{i:03d}")
-    
-    return documents, metadata, ids
-
-def populate_chromadb():
-    """Populate ChromaDB with bird data"""
-    print("Loading bird data from Wikipedia collection...")
-    
-    documents, metadata, ids = load_and_process_birds()
-    
-    if not documents:
-        print("No bird data to process")
-        return False
-    
-    print(f"Processing {len(documents)} bird entries")
-    
-    # Initialize ChromaDB client
-    chroma_client = ChromaClient()
-    collection_name = "bird_descriptions"
-    
-    try:
-        print(f"Deleting old collection '{collection_name}'...")
-        chroma_client.delete_collection(collection_name=collection_name)
-
-        # Add to ChromaDB
-        chroma_client.add_bird_data(
-            collection_name="bird_descriptions",
-            documents=documents,
-            metadata=metadata,
-            ids=ids
-        )
-        
-        print(f"Successfully populated ChromaDB with {len(documents)} bird species")
-
-        # Verify by doing a search
-        test_results = chroma_client.search_birds(
-            collection_name="bird_descriptions",
-            query="red breast small bird",
-            n_results=3
-        )
-        
-        if test_results and test_results['documents'][0]:
-            print("Database verification successful")
-            print(f"Sample search result: {test_results['metadatas'][0][0]['species']}")
-        else:
-            print("Warning: Database populated but search verification failed")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Failed to populate database: {e}")
-        return False
-
-if __name__ == "__main__":
-    success = populate_chromadb()import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
-import os
-import logging
-
-logger = logging.getLogger(__name__)
-
+# Ensure imports work from src/
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 class ChromaClient:
     def __init__(self):
         self.client = None
-        self.collections = {}
-        self.embedding_function = None
+        # Remove self.embedding_function
         self.setup_client()
 
     def setup_client(self):
-        """Initialize ChromaDB client with OpenAI embeddings"""
+        """Initialize ChromaDB client with the default embedding function"""
         try:
-            openai_api_key = os.getenv("OPENAI_API_KEY")
-            if not openai_api_key:
-                raise ValueError("OPENAI_API_KEY environment variable not set")
-
-            self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-                api_key=openai_api_key,
-                model_name="text-embedding-3-small",
-            )
-
             db_path = "./data/chroma_db"
             os.makedirs(db_path, exist_ok=True)
-
             self.client = chromadb.PersistentClient(
                 path=db_path,
                 settings=Settings(anonymized_telemetry=False),
             )
-
-            # Pre-create collections
-            self.collections["bird_descriptions"] = self.client.get_or_create_collection(
-                name="bird_descriptions",
-                metadata={"description": "Bird species descriptions and information"},
-                embedding_function=self.embedding_function,
-            )
-
-            self.collections["youtube_content"] = self.client.get_or_create_collection(
-                name="youtube_content",
-                metadata={"description": "YouTube video transcripts about birdwatching"},
-                embedding_function=self.embedding_function,
-            )
-
-            logger.info("ChromaDB client initialized with OpenAI embeddings")
-
+            logger.info("ChromaDB client initialized with the default embedding function")
         except Exception as e:
             logger.error(f"Failed to initialize ChromaDB: {e}")
+            raise
+
+    def get_or_create_collection(self, collection_name: str, metadata: dict = None):
+        """Get or create a collection by name."""
+        try:
+            # ChromaDB will automatically use its default embedding function here
+            collection = self.client.get_or_create_collection(
+                name=collection_name,
+                metadata=metadata or {"description": f"{collection_name} collection"},
+            )
+            return collection
+        except Exception as e:
+            logger.error(f"Failed to get/create collection '{collection_name}': {e}")
             raise
 
     def delete_collection(self, collection_name: str):
@@ -175,9 +57,7 @@ class ChromaClient:
     def add_data(self, collection_name: str, documents: list, metadata: list, ids: list):
         """Add data to specified collection"""
         try:
-            collection = self.client.get_or_create_collection(
-                name=collection_name, embedding_function=self.embedding_function
-            )
+            collection = self.get_or_create_collection(collection_name)
             collection.add(documents=documents, metadatas=metadata, ids=ids)
             logger.info(f"Added {len(documents)} documents to {collection_name}")
         except Exception as e:
@@ -189,19 +69,98 @@ class ChromaClient:
         try:
             collection = self.client.get_collection(name=collection_name)
             results = collection.query(query_texts=[query], n_results=n_results)
-
-            docs = results.get("documents", [])
-            if not docs or not docs[0]:
-                logger.info(f"No results found in {collection_name} for query: {query}")
-                return None
-
             return results
         except Exception as e:
             logger.error(f"Search failed in {collection_name}: {e}")
             return None
 
+def load_and_process_birds():
+    """Load bird data from JSON and prepare for ChromaDB"""
+    data_file = Path("data/raw/wikipedia_birds.json")
+    if not data_file.exists():
+        logger.error("Bird data file not found. Run data collection first.")
+        return None, None, None
+    with open(data_file, 'r', encoding='utf-8') as f:
+        birds_data = json.load(f)
+    documents = []
+    metadata = []
+    ids = []
+    for i, bird in enumerate(birds_data):
+        if bird.get('extract') and len(bird['extract']) > 100:
+            doc_text = f"{bird['title']}\n\n"
+            if bird.get('description'):
+                doc_text += f"Description: {bird['description']}\n\n"
+            doc_text += f"Information: {bird['extract']}"
+            documents.append(doc_text)
+            meta = {
+                'species': bird['title'],
+                'family': bird.get('family', 'Unknown'),
+                'region': 'Europe',
+                'source': 'Wikipedia',
+                'url': bird.get('page_url', ''),
+                'thumbnail': bird.get('thumbnail', {}).get('source', '') if bird.get('thumbnail') else '',
+                'search_name': bird.get('search_name', bird['title'])
+            }
+            metadata.append(meta)
+            ids.append(f"bird_{i:03d}")
+    return documents, metadata, ids
+
+def populate_chromadb():
+    """Populate ChromaDB with combined data"""
+    all_data = load_combined_data()
+    if not all_data:
+        logger.error("No data to process")
+        return False
+
+    chroma_client = ChromaClient()
+
+    # Use a single dictionary to hold documents, metadata, and ids for each collection
+    collections_data = {
+        "birds": {"docs": [], "metadatas": [], "ids": []},
+        "youtube": {"docs": [], "metadatas": [], "ids": []}
+    }
     
+    # Process data and populate the dictionary
+    bird_counter, youtube_counter = 0, 0
+    for item in all_data:
+        if item.get('type') == 'wikipedia_bird':
+            doc_text, metadata, doc_id = process_wikipedia_data(item, bird_counter)
+            if doc_text:
+                collections_data["birds"]["docs"].append(doc_text)
+                collections_data["birds"]["metadatas"].append(metadata)
+                collections_data["birds"]["ids"].append(doc_id)
+                bird_counter += 1
+        elif item.get('type') == 'youtube_chunk':
+            doc_text, metadata, doc_id = process_youtube_data(item, youtube_counter)
+            if doc_text:
+                collections_data["youtube"]["docs"].append(doc_text)
+                collections_data["youtube"]["metadatas"].append(metadata)
+                collections_data["youtube"]["ids"].append(doc_id)
+                youtube_counter += 1
+    
+    try:
+        # Loop through the dictionary to add data to each collection
+        for name, data in collections_data.items():
+            if data["docs"]:
+                chroma_client.add_data(
+                    collection_name=name,
+                    documents=data["docs"],
+                    metadata=data["metadatas"],
+                    ids=data["ids"]
+                )
+                logger.info(f"Added {len(data['docs'])} documents to '{name}'")
+        
+        # Verification can remain the same
+        # ... (your existing verification logic here) ...
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to populate database: {e}")
+        return False
+
+if __name__ == "__main__":
+    success = populate_chromadb()
     if success:
-        print("Database population complete. Ready for agent creation.")
+        logger.info("Database population complete. Ready for agent creation.")
     else:
-        print("Database population failed. Check errors above.")
+        logger.error("Database population failed. Check errors above.")

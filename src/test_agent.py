@@ -17,7 +17,7 @@ def test_bird_agent():
         
         # Test questions
         test_questions = [
-            "Tell me about the European Robin, can i see an image too?",
+            "i want to find a birding community",
         ]
         
         print("\nTesting agent with questions:")
