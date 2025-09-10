@@ -202,6 +202,7 @@ class BirdQAAgent:
     def __init__(self):
         self.chroma_client = ChromaClient()
         self.audio_processor = AudioProcessor()
+        self.query_count = 0  # Track queries to clear memory periodically
         
         # Initialize LangSmith tracking
         self.langsmith_client = None
@@ -223,11 +224,13 @@ class BirdQAAgent:
         
         self.query_expander = QueryExpander(self.llm)
         
+        # Use standard memory but clear it periodically
         self.memory = ConversationBufferWindowMemory(
             memory_key="chat_history",
             return_messages=True,
-            k=5
+            k=3  # Keep only last 3 exchanges
         )
+        
         self.tools = []
         self.agent = None
         
@@ -250,29 +253,24 @@ class BirdQAAgent:
         """Initialize the LangChain agent"""
         system_message = SystemMessage(content="""You are a European bird expert and guide. Your role is to help users with birdwatching questions.
 
-    **CRITICAL Tool Selection Rules:**
-    1. Use `bird_query` ONLY for questions about SPECIFIC BIRD SPECIES (e.g., "tell me about robins", "what does a sparrow look like")
-    2. Use `youtube_query` for ALL OTHER birdwatching topics including:
-        - Communities, groups, clubs ("birding community", "birdwatching groups") 
-        - Tips, techniques, guides ("birdwatching tips", "how to identify birds")
-        - Equipment, habitats, behavior ("binoculars", "bird behavior")
-        - General questions ("getting started with birdwatching")
+**CRITICAL Tool Selection Rules:**
+1. Use `bird_query` ONLY for questions about SPECIFIC BIRD SPECIES (e.g., "tell me about robins", "what does a sparrow look like")
+2. Use `youtube_query` for ALL OTHER birdwatching topics including:
+    - Communities, groups, clubs ("birding community", "birdwatching groups") 
+    - Tips, techniques, guides ("birdwatching tips", "how to identify birds")
+    - Equipment, habitats, behavior ("binoculars", "bird behavior")
+    - General questions ("getting started with birdwatching")
 
-    **Response Format - CRITICAL:**
-    - For **bird queries**: When you receive JSON from bird_query tool, ALWAYS return ONLY the JSON as your final answer. Do NOT modify it, do NOT add markdown, do NOT include image URLs in text.
-    - For **YouTube queries**: Extract the `summary` from the tool output and present it conversationally. Then add: "I found this from {video_count} videos. You can watch more at: [first URL]"
+**Response Format - MUST FOLLOW:**
+- For bird species queries: Return ONLY the description from the tool, nothing else. Do NOT include image URLs, markdown, or extra formatting.
+- For YouTube queries: Provide a conversational summary with video references.
 
-    **IMPORTANT:** 
-    - When bird_query returns JSON like {"species": "...", "description": "...", "image_url": "..."}, return EXACTLY that JSON
-    - Do NOT create markdown images like ![Bird](url) 
-    - Do NOT include image URLs in the description text
-    - Let the frontend handle image display
+**CRITICAL:** Never include image URLs in your text responses. Never use markdown images. Let the system handle images separately.
 
-    **Examples:**
-    User: "birding community" -> Use youtube_query (NOT bird_query)
-    User: "robin bird" -> Use bird_query -> Return the exact JSON from the tool
-    User: "birdwatching tips" -> Use youtube_query
-    User: "what is a sparrow" -> Use bird_query -> Return the exact JSON from the tool""")
+**Examples:**
+- Input: "robin" → Output: "The European robin is a small insectivorous passerine bird..."
+- Input: "blue tit" → Output: "The Eurasian blue tit is a small passerine bird in the tit family..."
+""")
         
         try:
             self.agent = initialize_agent(
@@ -289,6 +287,115 @@ class BirdQAAgent:
         except Exception as e:
             logger.error(f"Failed to initialize agent: {e}")
             raise
+    
+    def ask(self, question: str, input_type: str = "text") -> Dict[str, Any]:
+        try:
+            # Clear memory every 10 queries to prevent contamination
+            self.query_count += 1
+            if self.query_count % 10 == 0:
+                logger.info("Clearing agent memory to maintain consistency")
+                self.memory.clear()
+            
+            if not self.agent:
+                return {"answer": "Agent not properly initialized.", "images": [], "error": True}
+
+            # Direct approach: check if this looks like a bird species query
+            is_bird_species = self._is_bird_species_query(question)
+            
+            if is_bird_species:
+                # For bird species, get data directly from the tool
+                return self._handle_bird_species_query(question)
+            else:
+                # For other queries, use the agent normally
+                agent_response = self.agent.invoke({"input": question})
+                response_text = agent_response['output']
+                
+                # Clean any artifacts from the response
+                cleaned_response = self._clean_response_text(response_text)
+                
+                return {
+                    "answer": cleaned_response,
+                    "images": [],
+                    "error": False
+                }
+
+        except Exception as e:
+            logger.error(f"Error processing question '{question}': {e}")
+            return {
+                "answer": f"Sorry, I encountered an error processing your question. Please try again.",
+                "images": [],
+                "error": True
+            }
+    
+    def _is_bird_species_query(self, question: str) -> bool:
+        """Check if this is likely a bird species query"""
+        # Simple heuristics to detect bird species queries
+        question_lower = question.lower().strip()
+        
+        # Single word queries are likely species names
+        if len(question_lower.split()) <= 2:
+            return True
+            
+        # Common species query patterns
+        species_patterns = [
+            "what is a", "tell me about", "about the", "describe a", "show me a",
+            "robin", "eagle", "sparrow", "owl", "tit", "finch", "hawk", "crow"
+        ]
+        
+        for pattern in species_patterns:
+            if pattern in question_lower:
+                return True
+        
+        return False
+    
+    def _handle_bird_species_query(self, question: str) -> Dict[str, Any]:
+        """Handle bird species queries directly through the tool"""
+        try:
+            # Use the bird query tool directly
+            bird_tool = next(tool for tool in self.tools if tool.name == "bird_query")
+            tool_result = bird_tool._run(question)
+            
+            # Parse the JSON result
+            data = json.loads(tool_result)
+            
+            # Extract clean description and image
+            description = data.get("description", "No description available.")
+            image_url = data.get("image_url", "")
+            
+            return {
+                "answer": description,
+                "images": [image_url] if image_url else [],
+                "error": False
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in direct bird query: {e}")
+            # Fallback to agent
+            agent_response = self.agent.invoke({"input": question})
+            return {
+                "answer": self._clean_response_text(agent_response['output']),
+                "images": [],
+                "error": False
+            }
+    
+    def _clean_response_text(self, text: str) -> str:
+        """Clean response text of markdown images and URLs"""
+        import re
+        
+        # Remove markdown images
+        text = re.sub(r'!\[([^\]]*)\]\((https?://[^\s\)]+)\)', '', text)
+        
+        # Remove standalone image URLs
+        text = re.sub(r'https?://[^\s\'")}]+\.(jpg|jpeg|png|gif)', '', text)
+        
+        # Clean up extra whitespace and formatting
+        text = ' '.join(text.split())
+        
+        # Remove common artifacts
+        text = text.replace("Here is an image of", "").strip()
+        text = text.replace(": ![", "").strip()
+        
+        return text.strip()
     
     def process_audio_query(self, audio_file_path: str) -> Dict[str, Any]:
         """Process audio input and return response"""
@@ -345,96 +452,6 @@ class BirdQAAgent:
                 "answer": f"Error processing audio: {str(e)}",
                 "images": [],
                 "transcription": None,
-                "error": True
-            }
-    
-    import json, re
-
-    def ask(self, question: str, input_type: str = "text") -> Dict[str, Any]:
-        try:
-            if not self.agent:
-                return {"answer": "Agent not properly initialized.", "images": [], "error": True}
-
-            # Get the agent response
-            agent_response = self.agent.invoke({"input": question})
-            response = agent_response['output']
-            
-            answer = ""
-            images = []
-            
-            # Check if the response contains JSON-like structure (from bird_query tool)
-            if response.startswith('{"') and response.endswith('"}'):
-                try:
-                    # Parse the JSON response from bird_query tool
-                    import json
-                    data = json.loads(response)
-                    
-                    if "description" in data:
-                        answer = data["description"]
-                    elif "species" in data:
-                        # Format a nice response for bird species
-                        species = data.get("species", "Unknown")
-                        description = data.get("description", "No description available.")
-                        answer = f"The {species} - {description}"
-                    else:
-                        answer = str(data)
-                    
-                    # Extract image URL if present
-                    if "image_url" in data and data["image_url"]:
-                        images.append(data["image_url"])
-                        
-                except json.JSONDecodeError:
-                    # If JSON parsing fails, treat as plain text
-                    answer = response
-                    
-            # Check if response contains dictionary-like string (from youtube_query tool)
-            elif "summary" in response and "video_count" in response:
-                try:
-                    # Parse the string representation of dictionary from youtube_query
-                    import ast
-                    data = ast.literal_eval(response)
-                    
-                    summary = data.get("summary", "")
-                    video_count = data.get("video_count", 0)
-                    video_urls = data.get("video_urls", [])
-                    
-                    answer = summary
-                    if video_count > 0 and video_urls:
-                        answer += f"\n\nI found this from {video_count} videos. You can watch more at: {video_urls[0]}"
-                        
-                except (ValueError, SyntaxError):
-                    # If parsing fails, use the response as is
-                    answer = response
-            else:
-                # Plain text response - check for markdown images
-                answer = response
-                
-                # Try to extract markdown images first ![alt](url)
-                import re
-                markdown_match = re.search(r'!\[([^\]]*)\]\((https?://[^\s\)]+\.(jpg|jpeg|png|gif)[^\)]*)\)', response)
-                if markdown_match:
-                    images.append(markdown_match.group(2))  # group(2) is the URL
-                    # Remove the markdown image from the answer text
-                    answer = response.replace(markdown_match.group(0), "").strip()
-                else:
-                    # Try to extract plain image URLs
-                    url_match = re.search(r'https?://[^\s\'")}]+\.(jpg|jpeg|png|gif)', response)
-                    if url_match:
-                        images.append(url_match.group(0))
-                        # Remove the URL from the answer text
-                        answer = response.replace(url_match.group(0), "").strip()
-
-            return {
-                "answer": answer,
-                "images": images,
-                "error": False
-            }
-
-        except Exception as e:
-            logger.error(f"Error processing question '{question}': {e}")
-            return {
-                "answer": f"Sorry, I encountered an error processing your question. Please try again.",
-                "images": [],
                 "error": True
             }
     
