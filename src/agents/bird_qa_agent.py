@@ -327,27 +327,81 @@ class BirdQAAgent:
             if not self.agent:
                 return {"answer": "Agent not properly initialized.", "images": [], "error": True}
 
-            response = self.agent.invoke({"input": question})['output']
-            answer = response
+            # Get the agent response
+            agent_response = self.agent.invoke({"input": question})
+            response = agent_response['output']
+            
+            answer = ""
             images = []
+            
+            # Check if the response contains JSON-like structure (from bird_query tool)
+            if response.startswith('{"') and response.endswith('"}'):
+                try:
+                    # Parse the JSON response from bird_query tool
+                    import json
+                    data = json.loads(response)
+                    
+                    if "description" in data:
+                        answer = data["description"]
+                    elif "species" in data:
+                        # Format a nice response for bird species
+                        species = data.get("species", "Unknown")
+                        description = data.get("description", "No description available.")
+                        answer = f"The {species} - {description}"
+                    else:
+                        answer = str(data)
+                    
+                    # Extract image URL if present
+                    if "image_url" in data and data["image_url"]:
+                        images.append(data["image_url"])
+                        
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, treat as plain text
+                    answer = response
+                    
+            # Check if response contains dictionary-like string (from youtube_query tool)
+            elif "summary" in response and "video_count" in response:
+                try:
+                    # Parse the string representation of dictionary from youtube_query
+                    import ast
+                    data = ast.literal_eval(response)
+                    
+                    summary = data.get("summary", "")
+                    video_count = data.get("video_count", 0)
+                    video_urls = data.get("video_urls", [])
+                    
+                    answer = summary
+                    if video_count > 0 and video_urls:
+                        answer += f"\n\nI found this from {video_count} videos. You can watch more at: {video_urls[0]}"
+                        
+                except (ValueError, SyntaxError):
+                    # If parsing fails, use the response as is
+                    answer = response
+            else:
+                # Plain text response
+                answer = response
+                
+                # Try to extract any image URLs from plain text
+                import re
+                url_match = re.search(r'https?://[^\s\'")}]+\.(jpg|jpeg|png|gif)', response)
+                if url_match:
+                    images.append(url_match.group(0))
+                    # Remove the URL from the answer text
+                    answer = response.replace(url_match.group(0), "").strip()
 
-            try:
-                data = json.loads(response)  # This is failing
-                if "image_url" in data:
-                    images.append(data["image_url"])
-                if "description" in data:
-                    answer = data["description"]
-            except json.JSONDecodeError:
-                match = re.search(r'https?://\S+\.(jpg|jpeg|png|gif)', response)
-                if match:
-                    images.append(match.group(0))
-                    answer = response.replace(match.group(0), "").strip()
-
-            return {"answer": answer, "images": images, "error": False}
+            return {
+                "answer": answer,
+                "images": images,
+                "error": False
+            }
 
         except Exception as e:
-            logger.error(f"Error processing question: {e}")
-            return {"answer": f"Error: {str(e)}", "images": [], "error": True}
+            logger.error(f"Error processing question '{question}': {e}")
+            return {
+                "answer": f"Sorry, I encountered an error processing your question. Please try again.",
+                "images": [],
+                "error": True
+            }
     
     def get_conversation_history(self) -> List[Dict]:
         """Get conversation history"""
