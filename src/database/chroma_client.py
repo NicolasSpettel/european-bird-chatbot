@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 import chromadb
 from chromadb.config import Settings
+from chromadb.utils import embedding_functions
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -12,15 +13,17 @@ logger = logging.getLogger(__name__)
 
 # Ensure imports work from src/
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+    model_name="BAAI/bge-large-en-v1.5"
+)
 
 class ChromaClient:
     def __init__(self):
         self.client = None
-        # Remove self.embedding_function
         self.setup_client()
 
     def setup_client(self):
-        """Initialize ChromaDB client with the default embedding function"""
+        """Initialize ChromaDB client with the custom embedding function"""
         try:
             db_path = "./data/chroma_db"
             os.makedirs(db_path, exist_ok=True)
@@ -28,17 +31,17 @@ class ChromaClient:
                 path=db_path,
                 settings=Settings(anonymized_telemetry=False),
             )
-            logger.info("ChromaDB client initialized with the default embedding function")
+            logger.info(f"ChromaDB client initialized with custom embedding function: BAAI/bge-large-en-v1.5")
         except Exception as e:
             logger.error(f"Failed to initialize ChromaDB: {e}")
             raise
 
     def get_or_create_collection(self, collection_name: str, metadata: dict = None):
-        """Get or create a collection by name."""
+        """Get or create a collection by name, using the custom embedding function."""
         try:
-            # ChromaDB will automatically use its default embedding function here
             collection = self.client.get_or_create_collection(
                 name=collection_name,
+                embedding_function=embedding_function,  # Explicitly pass the custom embedding function
                 metadata=metadata or {"description": f"{collection_name} collection"},
             )
             return collection

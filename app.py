@@ -1,71 +1,66 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 from src.agents.bird_qa_agent import BirdQAAgent
-import tempfile
-import os
 import logging
+from dotenv import load_dotenv
+import re
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure logging to see what the agent is doing
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
+CORS(app)
 bird_agent = BirdQAAgent()
 logger = logging.getLogger(__name__)
 
+# This route is no longer used but kept for completeness in the file
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return "Backend is running!"
 
+# Route for handling text-based queries
 @app.route('/ask', methods=['POST'])
 def ask():
     print("=== NEW REQUEST ===")
-    print("Received request:", request.json)
     user_input = request.json.get('message')
-    print("User input:", user_input)
+    logger.info(f"Received text query: {user_input}")
     
-    try:
-        # Get the response from bird agent
-        response = bird_agent.ask(user_input)
-        print("Bird agent response:", response)
-        
-        # Extract the actual answer and image
-        actual_response = response.get('answer', 'No response available')
-        actual_images = response.get('images', [])
-        actual_image = actual_images[0] if actual_images else None
-        
-        print(f"Final response: {actual_response}")
-        print(f"Final image: {actual_image}")
-        print("=== END REQUEST ===")
-        
-        return jsonify({
-            'response': actual_response,
-            'image_url': actual_image
-        })
-        
-    except Exception as e:
-        print(f"Error in Flask route: {e}")
-        return jsonify({
-            'response': 'Sorry, I encountered an error processing your request.',
-            'image_url': None
-        }), 500
-
+    # Get the response from the bird agent
+    response = bird_agent.ask(user_input)
+    
+    logger.info(f"Agent response: {response['answer']}")
+    print("=== END REQUEST ===")
+    
+    # The agent now handles the image markdown, so we just return the full answer.
+    return jsonify({
+        'response': response['answer'],
+        'error': response['error']
+    })
+    
+# Route for handling audio-based queries
 @app.route('/ask_audio', methods=['POST'])
 def ask_audio():
     if 'audio' not in request.files:
         return jsonify({'error': 'No audio file provided'}), 400
     
     audio_file = request.files['audio']
-    if audio_file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-
+    
+    # The agent's method now handles transcription and error handling
+    # The agent's process_audio_bytes method expects the raw bytes
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            audio_file.save(tmp.name)
-            temp_path = tmp.name
+        audio_bytes = audio_file.read()
+        response = bird_agent.process_audio_bytes(audio_bytes, filename=audio_file.filename)
         
-        response = bird_agent.process_audio_query(temp_path)
-        os.unlink(temp_path)
-        
+        # We only return the final answer and transcription, as the agent
+        # now handles all internal logic.
         return jsonify({
-            'response': response.get('answer', 'No response'),
-            'image_url': response['images'][0] if response['images'] else None,
-            'transcription': response.get('transcription', None)
+            'response': response['answer'],
+            'transcription': response['transcription'],
+            'error': response['error']
         })
     except Exception as e:
         logger.error(f"Error processing audio upload: {e}")

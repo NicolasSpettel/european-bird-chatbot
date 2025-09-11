@@ -3,114 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatbot with Image</title>
+    <title>European Birdwatching Assistant</title>
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-image: url('https://upload.wikimedia.org/wikipedia/commons/4/47/Numida_meleagris_-Kruger_National_Park,_South_Africa-8a.jpg');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            position: relative;
+            background-color: #f4f7f9;
         }
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
+        .chat-container {
+            max-width: 1200px;
+            height: 85vh;
+            border-radius: 1rem;
+        }
+        .message-input-container {
+            backdrop-filter: blur(8px);
+        }
+        /* Custom scrollbar styles */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+        }
+        .bird-list-container {
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(2px);
-            z-index: -1;
-        }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border-left-color: #ffffff;
-            animation: spin 1s ease infinite;
-            display: none;
-        }
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(360deg);
-            }
+            overflow-y: auto;
         }
     </style>
 </head>
-<body class="flex items-center justify-center h-screen p-4">
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="chat-container flex flex-col bg-white shadow-xl p-6 md:flex-row gap-6">
 
-    <div class="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-8 w-full max-w-7xl">
-
-        <div class="flex-shrink-0 w-full md:w-64 h-[calc(100vh-8rem)] bg-white rounded-xl shadow-lg p-6">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Example Queries</h3>
-            <ul id="example-queries" class="space-y-2">
-                <li>
-                    <button class="w-full text-left p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200 text-sm">
-                        What is a Ring Ouzel?
-                    </button>
-                </li>
-                <li>
-                    <button class="w-full text-left p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200 text-sm">
-                        Tell me about the European Robin.
-                    </button>
-                </li>
-                <li>
-                    <button class="w-full text-left p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors duration-200 text-sm">
-                        Where can I find a European Golden Oriole?
-                    </button>
-                </li>
-            </ul>
+        <!-- Left Column: Bird List -->
+        <div class="flex-1 flex flex-col h-full bg-gray-50 rounded-xl p-4 shadow-inner">
+            <h2 class="text-xl font-bold text-gray-800 mb-2">European Birds</h2>
+            <div id="bird-list-container" class="bird-list-container bg-white rounded-lg p-2 shadow-inner">
+                <!-- Bird list will be populated here by JavaScript -->
+            </div>
         </div>
 
-        <div class="flex-1 flex flex-col h-[calc(100vh-8rem)] w-full bg-white rounded-xl shadow-lg overflow-hidden">
-            <div class="p-4 bg-white border-b border-gray-200 shadow-sm">
-                <h1 class="text-xl font-bold text-gray-800 text-center">European Birds QA Bot</h1>
-            </div>
+        <!-- Middle Column: Chat UI -->
+        <div class="flex-[2] flex flex-col h-full bg-gray-50 rounded-xl p-4 shadow-inner">
+            <h1 class="text-3xl font-extrabold text-gray-800 mb-4 text-center">Your Birdwatching Assistant</h1>
 
-            <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
-                <div class="flex items-start justify-start">
-                    <div class="bg-gray-100 text-gray-800 p-4 rounded-xl max-w-[80%] whitespace-pre-wrap break-all bot-message">
-                        <span>Hello Bird Friend! I am here to talk to you about Europes birds.</span>
-                        <button class="tts-btn text-gray-500 hover:text-gray-700 transition duration-200">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.666a3.84 3.84 0 0 1 .494 2.859M15.474 19.462a3.84 3.84 0 0 1-2.858-.494m-2.147-3.666a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m3.666 2.147a3.84 3.84 0 0 1 .494 2.859m-2.858.494a3.84 3.84 0 0 1-.494 2.859m-4.846 3.666a3.84 3.84 0 0 1-2.859-.494m-3.666-2.147a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859"/>
-                            </svg>
-                        </button>
+            <!-- Chat Messages Section -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 p-2 mb-4 chat-messages">
+                <!-- Initial greeting message -->
+                <div class="flex justify-start">
+                    <div class="bg-gray-200 text-gray-800 p-4 rounded-xl max-w-[80%]">
+                        Hello! I'm your European birdwatching expert. Ask me about a specific bird, or for general birdwatching tips.
                     </div>
                 </div>
             </div>
+            
+            <!-- Example queries section -->
+            <div id="example-queries" class="flex flex-wrap justify-center gap-2 mb-4">
+                <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm hover:bg-gray-300 transition duration-200 ease-in-out">What does a European Robin look like?</button>
+                <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm hover:bg-gray-300 transition duration-200 ease-in-out">How can I attract birds to my garden?</button>
+            </div>
 
-            <div class="border-t border-gray-200 p-4 bg-gray-50 flex items-center space-x-4">
-                <input type="text" id="user-input" placeholder="Type your message..." class="flex-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-                <input type="file" id="audio-input" accept="audio/wav" class="hidden">
-                <button id="audio-upload-btn" class="bg-gray-300 text-gray-700 p-3 rounded-xl font-medium shadow-md hover:bg-gray-400 transition duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75V21m-6.75-6.75h13.5M19.5 12a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
+            <!-- Input area -->
+            <div class="message-input-container flex items-center p-2 bg-white rounded-full shadow-lg border border-gray-200">
+                <input type="text" id="user-input" placeholder="Ask a question about birds..." class="flex-1 p-3 bg-transparent outline-none rounded-full text-gray-800">
+                <button id="send-btn" class="flex items-center justify-center bg-blue-500 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <span id="send-btn-text" class="hidden">Send</span>
+                    <svg id="loading-spinner" class="animate-spin h-5 w-5 text-white" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                </button>
-                <button id="send-btn" class="bg-blue-600 text-white p-3 rounded-xl font-medium shadow-md hover:bg-blue-700 transition duration-200 flex items-center justify-center">
-                    <span id="send-btn-text">Send</span>
-                    <div id="loading-spinner" class="spinner ml-2"></div>
+                    <svg id="send-icon" class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
                 </button>
             </div>
         </div>
-
-        <div id="image-container" class="flex-shrink-0 w-full md:w-80 h-[calc(100vh-8rem)] bg-gray-200 rounded-xl shadow-lg flex items-center justify-center text-gray-500 text-center p-4">
-            <span class="p-4 rounded-md bg-white/50 backdrop-blur-md">
-                Wikipedia Image Placeholder
-            </span>
+        
+        <!-- Right Column: Image Display -->
+        <div class="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-xl p-4 shadow-inner">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Featured Image</h2>
+            <div id="image-container" class="w-full h-full flex items-center justify-center bg-gray-200 rounded-xl">
+                <span class="p-4 text-gray-600 rounded-md bg-white/50 backdrop-blur-md">
+                    Wikipedia Image Placeholder
+                </span>
+            </div>
         </div>
     </div>
 
     <script>
+    document.addEventListener('DOMContentLoaded', function() {
         const chatMessages = document.getElementById('chat-messages');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
@@ -118,60 +100,80 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const imageContainer = document.getElementById('image-container');
         const exampleQueries = document.getElementById('example-queries');
-        const audioUploadBtn = document.getElementById('audio-upload-btn');
-        const audioInput = document.getElementById('audio-input');
-
-        const apiKey = ""; // You need to set your API key here.
-        const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-
-        const base64ToArrayBuffer = (base64) => {
-            const binaryString = window.atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            return bytes.buffer;
-        };
-
-        const pcmToWav = (pcmData, sampleRate) => {
-            const numChannels = 1;
-            const bitsPerSample = 16;
-            const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-            const blockAlign = numChannels * bitsPerSample / 8;
-
-            const buffer = new ArrayBuffer(44 + pcmData.byteLength);
-            const view = new DataView(buffer);
-
-            const writeString = (str) => {
-                for (let i = 0; i < str.length; i++) {
-                    view.setUint8(i, str.charCodeAt(i));
-                }
-            };
-
-            writeString('RIFF');
-            view.setUint32(4, 36 + pcmData.byteLength, true);
-            writeString('WAVE');
-
-            writeString('fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, numChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, byteRate, true);
-            view.setUint16(32, blockAlign, true);
-            view.setUint16(34, bitsPerSample, true);
-
-            writeString('data');
-            view.setUint32(40, pcmData.byteLength, true);
-            
-            const pcmBytes = new Uint8Array(pcmData);
-            for (let i = 0; i < pcmData.byteLength; i++) {
-                view.setUint8(44 + i, pcmBytes[i]);
-            }
-
-            return new Blob([view], { type: 'audio/wav' });
-        };
+        const birdListContainer = document.getElementById('bird-list-container');
+        
+        const birds = [
+            "Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose",
+            "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Pintail", "Shoveler", "Pochard",
+            "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Goldeneye", "Smew", "Red-breasted Merganser",
+            "Goosander", "Velvet Scoter",
+            "Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail",
+            "Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe",
+            "Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove", "Turtle Dove",
+            "Common Cuckoo",
+            "Nightjar",
+            "Common Swift", "Pallid Swift", "Alpine Swift",
+            "Water Rail", "Spotted Crake", "Corn Crake", "Moorhen", "Coot",
+            "Common Crane",
+            "Great Bustard", "Little Bustard",
+            "Eurasian Oystercatcher",
+            "Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover",
+            "Grey Plover", "Dotterel",
+            "Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit",
+            "Whimbrel", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper",
+            "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint",
+            "Temminck's Stint", "Dunlin", "Ruff", "Avocet",
+            "Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull",
+            "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull",
+            "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull",
+            "Ivory Gull", "Glaucous Gull",
+            "Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern",
+            "White-winged Black Tern",
+            "Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin",
+            "White Stork", "Black Stork",
+            "Great Bittern", "Little Bittern", "Grey Heron", "Purple Heron", "Great Egret", "Little Egret",
+            "Cattle Egret", "Squacco Heron", "Night Heron",
+            "Glossy Ibis", "Spoonbill",
+            "Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle",
+            "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk",
+            "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon",
+            "Merlin", "Hobby", "Peregrine Falcon",
+            "Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl",
+            "Little Owl", "Pygmy Owl",
+            "Common Kingfisher",
+            "Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker",
+            "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker",
+            "Woodlark", "Skylark", "Crested Lark", "Shore Lark",
+            "Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow",
+            "Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail",
+            "Yellow Wagtail",
+            "Waxwing",
+            "White-throated Dipper",
+            "Eurasian Wren",
+            "Dunnock",
+            "European Robin", "Common Nightingale", "Bluethroat", "Redstart", "Black Redstart",
+            "Stonechat", "Whinchat", "Wheatear",
+            "Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush",
+            "Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler",
+            "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler",
+            "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat",
+            "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler",
+            "Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher",
+            "Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit",
+            "Eurasian Nuthatch",
+            "Eurasian Treecreeper", "Short-toed Treecreeper",
+            "Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike",
+            "Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow",
+            "Hooded Crow", "Raven",
+            "European Starling", "Rose-coloured Starling",
+            "House Sparrow", "Tree Sparrow",
+            "Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Goldfinch", "Siskin", "Linnet",
+            "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill",
+            "Parrot Crossbill", "Bullfinch",
+            "Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting",
+            "Corn Bunting", "Lapland Bunting", "Snow Bunting",
+            "Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe", "Hawfinch", "Wryneck"
+        ];
         
         const addMessage = (text, sender, transcription = null) => {
             const messageDiv = document.createElement('div');
@@ -187,14 +189,7 @@
                 messageDiv.innerHTML = `<div class="bg-blue-500 text-white p-4 rounded-xl max-w-[80%] break-words">${contentHTML}</div>`;
             } else {
                 messageDiv.classList.add('justify-start');
-                messageDiv.innerHTML = `<div class="bg-gray-100 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words">
-                                            <span>${contentHTML}</span>
-                                            <button class="tts-btn text-gray-500 hover:text-gray-700 transition duration-200">
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.666a3.84 3.84 0 0 1 .494 2.859M15.474 19.462a3.84 3.84 0 0 1-2.858-.494m-2.147-3.666a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m3.666 2.147a3.84 3.84 0 0 1 .494 2.859m-2.858.494a3.84 3.84 0 0 1-.494 2.859m-4.846 3.666a3.84 3.84 0 0 1-2.859-.494m-3.666-2.147a3.84 3.84 0 0 1-.494-2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859m4.846-3.666a3.84 3.84 0 0 1 2.859.494m-2.147 3.666a3.84 3.84 0 0 1-.494 2.859"/>
-                                                </svg>
-                                            </button>
-                                        </div>`;
+                messageDiv.innerHTML = `<div class="bg-gray-100 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words"><span>${contentHTML}</span></div>`;
             }
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -206,13 +201,13 @@
             if (imageUrl) {
                 const imgElement = document.createElement('img');
                 imgElement.src = imageUrl;
-                imgElement.alt = "Wikipedia Image";
+                imgElement.alt = "Bird image from Wikipedia";
                 imgElement.classList.add(
-                    'w-full',        // take full width
-                    'h-auto',        // keep natural aspect ratio
-                    'object-contain',// scale but don’t crop
+                    'w-full',
+                    'h-auto',
+                    'object-contain',
                     'rounded-xl',
-                    'shadow'         // small shadow for clarity
+                    'shadow'
                 );
                 imageContainer.appendChild(imgElement);
             } else {
@@ -224,13 +219,11 @@
             }
         };
 
-
         const showLoading = () => {
             sendBtnText.textContent = '...';
             loadingSpinner.style.display = 'block';
             sendBtn.disabled = true;
             userInput.disabled = true;
-            audioUploadBtn.disabled = true;
         };
 
         const hideLoading = () => {
@@ -238,7 +231,18 @@
             loadingSpinner.style.display = 'none';
             sendBtn.disabled = false;
             userInput.disabled = false;
-            audioUploadBtn.disabled = false;
+        };
+
+        // Helper function to extract and remove markdown image URL
+        const processMarkdown = (text) => {
+            const regex = /!\[.*?\]\((.*?)\)/;
+            const match = text.match(regex);
+            if (match) {
+                const imageUrl = match[1];
+                const cleanedText = text.replace(regex, '').trim();
+                return { text: cleanedText, imageUrl: imageUrl };
+            }
+            return { text: text, imageUrl: null };
         };
 
         const sendMessage = async () => {
@@ -262,9 +266,11 @@
 
                 const data = await response.json();
                 hideLoading();
-
-                addMessage(data.response, 'bot');
-                displayImage(data.image_url);
+                
+                // Process the markdown response from the backend
+                const processed = processMarkdown(data.response);
+                addMessage(processed.text, 'bot');
+                displayImage(processed.imageUrl);
 
             } catch (error) {
                 console.error('Error fetching bot response:', error);
@@ -272,43 +278,32 @@
                 addMessage("Sorry, I couldn't connect to the server. Please check your backend.", 'bot');
             }
         };
-        
-        const sendAudio = async (file) => {
-            const formData = new FormData();
-            formData.append('audio', file, file.name);
 
-            addMessage('Uploading audio...', 'user');
-            showLoading();
-
-            try {
-                const response = await fetch('http://localhost:5000/ask_audio', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                hideLoading();
-
-                if (data.transcription) {
-                    const lastUserMessage = chatMessages.querySelector('.justify-end:last-child');
-                    if (lastUserMessage) {
-                        lastUserMessage.innerHTML = `<div class="bg-blue-500 text-white p-4 rounded-xl max-w-[80%]"><strong>(Transcription)</strong><br>${data.transcription}</div>`;
-                    }
-                }
-                addMessage(data.response, 'bot');
-                displayImage(data.image_url);
-                
-            } catch (error) {
-                console.error('Error processing audio:', error);
-                hideLoading();
-                addMessage("Sorry, I couldn't process the audio. Please try again.", 'bot');
-            }
+        // Function to render the bird list
+        const renderBirdList = () => {
+            birds.forEach(bird => {
+                const birdButton = document.createElement('button');
+                birdButton.classList.add(
+                    'block',
+                    'w-full',
+                    'px-4',
+                    'py-2',
+                    'mb-1',
+                    'bg-gray-100',
+                    'text-gray-700',
+                    'rounded-lg',
+                    'text-left',
+                    'hover:bg-gray-200',
+                    'transition',
+                    'duration-200',
+                    'ease-in-out'
+                );
+                birdButton.textContent = bird;
+                birdListContainer.appendChild(birdButton);
+            });
         };
 
+        // Event listeners
         sendBtn.addEventListener('click', sendMessage);
         userInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
@@ -323,89 +318,16 @@
             }
         });
 
-        audioUploadBtn.addEventListener('click', () => {
-            audioInput.click();
-        });
-
-        audioInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                sendAudio(file);
+        birdListContainer.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON') {
+                userInput.value = event.target.textContent.trim();
+                sendMessage();
             }
         });
 
-        chatMessages.addEventListener('click', async (event) => {
-            const ttsButton = event.target.closest('.tts-btn');
-            if (ttsButton) {
-                const messageSpan = ttsButton.parentElement.querySelector('span');
-                const messageText = messageSpan.textContent.trim();
-                const originalSvg = ttsButton.innerHTML;
-
-                ttsButton.disabled = true;
-                ttsButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 animate-spin">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181-3.181m0 0l-3.181-3.182m-4.992 0h-4.991v-.001M16.023 19.644h4.992v-.001m-4.991 0l-3.181 3.181m-3.182-3.181-3.181-3.181"/>
-                                        </svg>`;
-                
-                try {
-                    const payload = {
-                        contents: [{
-                            parts: [{ text: messageText }]
-                        }],
-                        generationConfig: {
-                            responseModalities: ["AUDIO"],
-                            speechConfig: {
-                                voiceConfig: {
-                                    prebuiltVoiceConfig: { voiceName: "Kore" }
-                                }
-                            }
-                        },
-                        model: "gemini-2.5-flash-preview-tts"
-                    };
-
-                    const response = await fetch(ttsUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const result = await response.json();
-                    const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                    const mimeType = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType;
-
-                    if (audioData && mimeType && mimeType.startsWith("audio/")) {
-                        const sampleRateMatch = mimeType.match(/rate=(\d+)/);
-                        if (sampleRateMatch) {
-                            const sampleRate = parseInt(sampleRateMatch[1], 10);
-                            const pcmData = base64ToArrayBuffer(audioData);
-                            const wavBlob = pcmToWav(pcmData, sampleRate);
-                            const audioUrl = URL.createObjectURL(wavBlob);
-                            const audio = new Audio(audioUrl);
-                            audio.play();
-
-                            audio.onended = () => {
-                                ttsButton.disabled = false;
-                                ttsButton.innerHTML = originalSvg;
-                            };
-                            audio.onerror = () => {
-                                console.error("Audio playback failed.");
-                                ttsButton.disabled = false;
-                                ttsButton.innerHTML = originalSvg;
-                            };
-                        }
-                    } else {
-                        throw new Error("Invalid audio data from API");
-                    }
-                } catch (error) {
-                    console.error('Error with TTS:', error);
-                    ttsButton.disabled = false;
-                    ttsButton.innerHTML = originalSvg;
-                }
-            }
-        });
+        // Initial render of the bird list
+        renderBirdList();
+    });
     </script>
 </body>
 </html>

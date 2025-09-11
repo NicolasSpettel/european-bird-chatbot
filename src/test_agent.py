@@ -17,7 +17,10 @@ def test_bird_agent():
         
         # Test questions
         test_questions = [
-            "i want to find a birding community",
+            "can we talk about crows",
+            "what is their primary diet?",
+            "what does the barn owl look like?",
+            "is the barn owl the same as the tawny owl?"
         ]
         
         print("\nTesting agent with questions:")
@@ -33,9 +36,7 @@ def test_bird_agent():
                 print(f"ERROR: {response['answer']}")
             else:
                 print(f"Answer: {response['answer']}")
-                if response["images"]:
-                    print(f"Images: {response['images']}")
-                    
+                
         print("\n" + "=" * 50)
         print("Agent testing complete!")
         

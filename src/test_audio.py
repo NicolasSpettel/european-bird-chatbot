@@ -1,59 +1,52 @@
+import logging
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from pathlib import Path
 
-from src.tools.audio_processor import AudioProcessor
+# Add the project's root directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.agents.bird_qa_agent import BirdQAAgent
-import logging
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging to see what the agent is doing
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-def run_audio_test():
+def run_audio_test(audio_file_path: str):
     """
-    Tests the audio processing and agent pipeline with a real audio file.
-    """
-    audio_file = "./tests/test_audio/barn_or_tawny_owl.wav"
-
-    if not os.path.exists(audio_file):
-        print(f"❌ Error: The audio file '{audio_file}' was not found.")
-        print("Please ensure your folder structure is correct and the file exists.")
-        return
-
-    print(f"🎵 Found audio file: {audio_file}")
+    Tests the BirdQAAgent's audio processing functionality.
     
+    Args:
+        audio_file_path: The path to the audio file to be processed.
+    """
     try:
-        # Step 1: Transcribe the audio
-        print("\n🔄 Transcribing audio...")
-        processor = AudioProcessor()
-        transcription = processor.transcribe_audio(audio_file)
+        logger.info(f"Loading audio from: {audio_file_path}")
         
-        if not transcription:
-            print("❌ Transcription failed or returned an empty result.")
-            return
+        # Read the audio file into a byte stream
+        with open(audio_file_path, 'rb') as f:
+            audio_bytes = f.read()
 
-        print(f"✅ Transcription successful: '{transcription}'")
-        
-        # Step 2: Process the transcription with the Bird Q&A Agent
-        print("\n🤖 Sending query to Bird Q&A Agent...")
+        logger.info("Initializing the Bird Q&A Agent...")
         agent = BirdQAAgent()
-        response = agent.process_audio_query(audio_file)
         
-        print("\n📋 Agent Response:")
-        if response.get('error'):
-            print(f"❌ An error occurred: {response['answer']}")
+        # Use the correct method name `process_audio_bytes`
+        logger.info("Sending audio bytes to agent for processing...")
+        response = agent.process_audio_bytes(audio_bytes, filename=Path(audio_file_path).name)
+        
+        # Display the results
+        if not response['error']:
+            print("✅ Test successful:")
+            print(f"   Transcription: '{response.get('transcription', 'N/A')}'")
+            print(f"   Agent's Answer: {response['answer']}")
         else:
-            print(f"✅ Agent returned a successful response.")
-            print(f"Answer: {response['answer']}")
-            if 'images' in response and response['images']:
-                print(f"Image URL: {response['images'][0]}")
-
+            print(f"❌ Test failed due to an error: {response['answer']}")
+        
+    except FileNotFoundError:
+        logger.error(f"Audio file not found at: {audio_file_path}")
     except Exception as e:
-        print(f"❌ An unexpected error occurred during the test: {e}")
-        logging.error("Test failed due to an exception.", exc_info=True)
+        logger.error(f"An unexpected error occurred during the test: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    print("🐦 Running simplified audio test...")
-    print("-" * 35)
-    run_audio_test()
-    print("-" * 35)
-    print("Test finished.")
+    test_audio_file = "./tests/test_audio/barn_or_tawny_owl.wav"
+    run_audio_test(test_audio_file)

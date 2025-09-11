@@ -21,20 +21,29 @@ def load_combined_data():
 def process_wikipedia_data(bird_data, doc_id):
     """Process Wikipedia bird data"""
     logger.info(f"Thumbnail type: {type(bird_data.get('thumbnail'))}, value: {bird_data.get('thumbnail')}")
-
     if not bird_data.get('extract') or len(bird_data['extract']) < 100:
         return None, None, None
     doc_text = f"{bird_data['title']}\n\n"
     if bird_data.get('description'):
         doc_text += f"Description: {bird_data['description']}\n\n"
     doc_text += f"Information: {bird_data['extract']}"
+
+    # Handle both string and dictionary formats for the thumbnail
+    thumbnail_data = bird_data.get('thumbnail')
+    if isinstance(thumbnail_data, dict):
+        thumbnail_url = thumbnail_data.get('source', '')
+    elif isinstance(thumbnail_data, str):
+        thumbnail_url = thumbnail_data
+    else:
+        thumbnail_url = ''
+        
     metadata = {
         'species': bird_data['title'],
         'family': "Unknown",
         'region': 'Europe',
         'source': 'Wikipedia',
         'url': bird_data.get('page_url', ''),
-        'thumbnail': bird_data.get('thumbnail', ''),
+        'thumbnail': thumbnail_url,
         'search_name': bird_data.get('original_search', bird_data['title']),
         'type': 'bird_description'
     }
@@ -42,26 +51,13 @@ def process_wikipedia_data(bird_data, doc_id):
 
 def process_youtube_data(video_data, doc_id):
     """Process YouTube video data"""
-    
-    # Check if 'content' and 'metadata' fields exist at the top level
     if not video_data.get('content') or not video_data.get('metadata'):
         return None, None, None
-    
-    # Use the 'content' field as the main document text.
-    # It already contains the title, author, and transcript.
     doc_text = video_data['content']
-
-    # Use the 'metadata' field directly as the metadata dictionary.
     metadata = video_data['metadata']
-
-    # The length check can be done on the full document text.
     if len(doc_text) < 100:
         return None, None, None
-    
-    # Use the 'id' field from the JSON or create a fallback.
     doc_id_final = video_data.get('id', f"youtube_{doc_id:03d}")
-
-    # Return the correctly extracted document, metadata, and ID
     return doc_text, metadata, doc_id_final
 
 def populate_chromadb():
@@ -70,16 +66,16 @@ def populate_chromadb():
     if not all_data:
         logger.error("No data to process")
         return False
-
     chroma_client = ChromaClient()
 
-    # Use a single dictionary to hold documents, metadata, and ids for each collection
+    # CRITICAL FIX: Delete existing collections to avoid embedding function conflicts.
+    chroma_client.delete_collection("birds")
+    chroma_client.delete_collection("youtube")
+    
     collections_data = {
         "birds": {"docs": [], "metadatas": [], "ids": []},
         "youtube": {"docs": [], "metadatas": [], "ids": []}
     }
-    
-    # Process data and populate the dictionary
     bird_counter, youtube_counter = 0, 0
     for item in all_data:
         if item.get('type') == 'wikipedia_bird':
@@ -89,7 +85,6 @@ def populate_chromadb():
                 collections_data["birds"]["metadatas"].append(metadata)
                 collections_data["birds"]["ids"].append(doc_id)
                 bird_counter += 1
-        # CORRECT THE TYPE HERE: Change 'youtube_video' to 'youtube_chunk'
         elif item.get('type') == 'youtube_chunk':
             doc_text, metadata, doc_id = process_youtube_data(item, youtube_counter)
             if doc_text:
@@ -99,7 +94,6 @@ def populate_chromadb():
                 youtube_counter += 1
     
     try:
-        # Loop through the dictionary to add data to each collection
         for name, data in collections_data.items():
             if data["docs"]:
                 chroma_client.add_data(
@@ -110,7 +104,6 @@ def populate_chromadb():
                 )
                 logger.info(f"Added {len(data['docs'])} documents to '{name}'")
         
-        # You need to add a verification for the youtube collection as well
         if collections_data["birds"]["docs"]:
             test_results_birds = chroma_client.search(
                 collection_name="birds",
@@ -128,7 +121,6 @@ def populate_chromadb():
             )
             if test_results_youtube and test_results_youtube.get('documents', [[]])[0]:
                 logger.info("YouTube database verification successful")
-
         return True
     except Exception as e:
         logger.error(f"Failed to populate database: {e}")
