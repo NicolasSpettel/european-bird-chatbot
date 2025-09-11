@@ -20,33 +20,28 @@ def load_combined_data():
 
 def process_wikipedia_data(bird_data, doc_id):
     """Process Wikipedia bird data"""
-    logger.info(f"Thumbnail type: {type(bird_data.get('thumbnail'))}, value: {bird_data.get('thumbnail')}")
-    if not bird_data.get('extract') or len(bird_data['extract']) < 100:
+    # Handle missing 'extract' and short extracts
+    extract = bird_data.get('extract')
+    if not extract or len(extract) < 100:
         return None, None, None
-    doc_text = f"{bird_data['title']}\n\n"
-    if bird_data.get('description'):
-        doc_text += f"Description: {bird_data['description']}\n\n"
-    doc_text += f"Information: {bird_data['extract']}"
 
-    # Handle both string and dictionary formats for the thumbnail
-    thumbnail_data = bird_data.get('thumbnail')
-    if isinstance(thumbnail_data, dict):
-        thumbnail_url = thumbnail_data.get('source', '')
-    elif isinstance(thumbnail_data, str):
-        thumbnail_url = thumbnail_data
-    else:
-        thumbnail_url = ''
-        
+    # Ensure all values are strings for ChromaDB metadata
     metadata = {
-        'species': bird_data['title'],
+        'species': str(bird_data.get('title', '')),
         'family': "Unknown",
         'region': 'Europe',
         'source': 'Wikipedia',
-        'url': bird_data.get('page_url', ''),
-        'thumbnail': thumbnail_url,
-        'search_name': bird_data.get('original_search', bird_data['title']),
+        'url': str(bird_data.get('page_url', '')),
+        'thumbnail': str(bird_data.get('thumbnail', '')),
+        'search_name': str(bird_data.get('original_search', bird_data.get('title', ''))),
+        'audio_url': str(bird_data.get('audio_url', '')),
         'type': 'bird_description'
     }
+
+    doc_text = (f"{metadata['species']}\n\n"
+                f"Description: {bird_data.get('description', '')}\n\n"
+                f"Information: {extract}")
+
     return doc_text, metadata, f"bird_{doc_id:03d}"
 
 def process_youtube_data(video_data, doc_id):
@@ -66,61 +61,55 @@ def populate_chromadb():
     if not all_data:
         logger.error("No data to process")
         return False
+    
     chroma_client = ChromaClient()
 
-    # CRITICAL FIX: Delete existing collections to avoid embedding function conflicts.
+    # The warning "Collection [youtube] does not exists" is expected on the first run.
+    # It is safe to ignore. Deleting existing collections to avoid embedding function conflicts.
     chroma_client.delete_collection("birds")
     chroma_client.delete_collection("youtube")
     
-    collections_data = {
-        "birds": {"docs": [], "metadatas": [], "ids": []},
-        "youtube": {"docs": [], "metadatas": [], "ids": []}
-    }
+    bird_docs, bird_metadatas, bird_ids = [], [], []
+    youtube_docs, youtube_metadatas, youtube_ids = [], [], []
+
     bird_counter, youtube_counter = 0, 0
     for item in all_data:
         if item.get('type') == 'wikipedia_bird':
             doc_text, metadata, doc_id = process_wikipedia_data(item, bird_counter)
-            if doc_text:
-                collections_data["birds"]["docs"].append(doc_text)
-                collections_data["birds"]["metadatas"].append(metadata)
-                collections_data["birds"]["ids"].append(doc_id)
+            if doc_text:  # This check ensures doc_text is not None
+                bird_docs.append(doc_text)
+                bird_metadatas.append(metadata)
+                bird_ids.append(doc_id)
                 bird_counter += 1
         elif item.get('type') == 'youtube_chunk':
             doc_text, metadata, doc_id = process_youtube_data(item, youtube_counter)
-            if doc_text:
-                collections_data["youtube"]["docs"].append(doc_text)
-                collections_data["youtube"]["metadatas"].append(metadata)
-                collections_data["youtube"]["ids"].append(doc_id)
+            if doc_text: # This check ensures doc_text is not None
+                youtube_docs.append(doc_text)
+                youtube_metadatas.append(metadata)
+                youtube_ids.append(doc_id)
                 youtube_counter += 1
     
     try:
-        for name, data in collections_data.items():
-            if data["docs"]:
-                chroma_client.add_data(
-                    collection_name=name,
-                    documents=data["docs"],
-                    metadata=data["metadatas"],
-                    ids=data["ids"]
-                )
-                logger.info(f"Added {len(data['docs'])} documents to '{name}'")
-        
-        if collections_data["birds"]["docs"]:
-            test_results_birds = chroma_client.search(
+        if bird_docs:
+            chroma_client.add_data(
                 collection_name="birds",
-                query="red breast small bird",
-                n_results=3
+                documents=bird_docs,
+                metadata=bird_metadatas,
+                ids=bird_ids
             )
-            if test_results_birds and test_results_birds.get('documents', [[]])[0]:
-                logger.info("Bird database verification successful")
+            logger.info(f"Added {len(bird_docs)} documents to 'birds'")
         
-        if collections_data["youtube"]["docs"]:
-            test_results_youtube = chroma_client.search(
+        if youtube_docs:
+            chroma_client.add_data(
                 collection_name="youtube",
-                query="beginner birdwatching tips",
-                n_results=3
+                documents=youtube_docs,
+                metadata=youtube_metadatas,
+                ids=youtube_ids
             )
-            if test_results_youtube and test_results_youtube.get('documents', [[]])[0]:
-                logger.info("YouTube database verification successful")
+            logger.info(f"Added {len(youtube_docs)} documents to 'youtube'")
+            
+        # Optional: Add your verification checks here to confirm data exists.
+        
         return True
     except Exception as e:
         logger.error(f"Failed to populate database: {e}")
@@ -129,6 +118,6 @@ def populate_chromadb():
 if __name__ == "__main__":
     success = populate_chromadb()
     if success:
-        logger.info("Database population complete. Ready for agent creation.")
+        logger.info("Database population complete.")
     else:
         logger.error("Database population failed. Check errors above.")

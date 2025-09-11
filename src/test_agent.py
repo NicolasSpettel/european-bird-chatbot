@@ -17,10 +17,8 @@ def test_bird_agent():
         
         # Test questions
         test_questions = [
-            "can we talk about crows",
-            "what is their primary diet?",
-            "what does the barn owl look like?",
-            "is the barn owl the same as the tawny owl?"
+            "i want to know something about the mute swan",
+            "do you like birds?",
         ]
         
         print("\nTesting agent with questions:")

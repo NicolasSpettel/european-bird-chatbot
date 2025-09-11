@@ -2,13 +2,15 @@ import sys
 import os
 import json
 import logging
+import traceback
 from pathlib import Path
 from datetime import datetime
 
 # Ensure imports work from src/
+# Assuming bird_collector.py is the correct module name for SimpleWikipediaCollector
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
-from src.data.collectors.simple_collector import SimpleWikipediaCollector
+from src.data.collectors.bird_collector import SimpleWikipediaCollector
 from src.data.collectors.youtube_collector import YouTubeTranscriptCollector
 
 logging.basicConfig(level=logging.INFO)
@@ -171,8 +173,8 @@ EUROPEAN_BIRDS = [
     "Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting",
     "Corn Bunting", "Lapland Bunting", "Snow Bunting",
 
-    # Miscellaneous
-    "Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe", "Hawfinch", "Wryneck",
+    # Miscellaneous (removed duplicates)
+    "Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe",
 ]
 
 
@@ -185,11 +187,11 @@ YOUTUBE_VIDEOS = [
         "url": "https://www.youtube.com/watch?v=hK30ObyJt6M",
         "category": "beginners_guide",
     },
-            {
+        {
         "url": "https://www.youtube.com/watch?v=uuY_7i040ug",
         "category": "beginners_guide",
     },
-            {
+        {
         "url": "https://www.youtube.com/watch?v=js4Ir0ExlYQ",
         "category": "photography_guide",
     },
@@ -272,27 +274,26 @@ def collect_all_data():
         except Exception as e:
             logger.error(f"Failed to collect Wikipedia data for {bird_name}: {e}")
 
-    import traceback
     for video in YOUTUBE_VIDEOS:
-            try:
-                  logger.info(f"Processing YouTube video: {video['url']}")
-                  video_data = youtube_collector.collect_video_data(
-                  video["url"], video.get("category", "birdwatching")
-                  )
-                  if not video_data:
-                        logger.warning(f"No data collected for: {video['url']}")
-                        continue
-                  documents, metadatas, ids = process_youtube_data(video_data, doc_id_counter)
-                  doc_id_counter += 1
-                  for doc_text, metadata, doc_id in zip(documents, metadatas, ids):
-                        all_data.append({
-                              "id": doc_id,
-                              "content": doc_text,
-                              "metadata": metadata,
-                              "type": "youtube_chunk"
-                        })
-            except Exception as e:
-                  logger.error(f"Failed to collect YouTube data for {video['url']}: {e}\n{traceback.format_exc()}")
+        try:
+            logger.info(f"Processing YouTube video: {video['url']}")
+            video_data = youtube_collector.collect_video_data(
+                video["url"], video.get("category", "birdwatching")
+            )
+            if not video_data:
+                logger.warning(f"No data collected for: {video['url']}")
+                continue
+            documents, metadatas, ids = process_youtube_data(video_data, doc_id_counter)
+            doc_id_counter += 1
+            for doc_text, metadata, doc_id in zip(documents, metadatas, ids):
+                all_data.append({
+                    "id": doc_id,
+                    "content": doc_text,
+                    "metadata": metadata,
+                    "type": "youtube_chunk"
+                })
+        except Exception as e:
+            logger.error(f"Failed to collect YouTube data for {video['url']}: {e}\n{traceback.format_exc()}")
 
     # Save combined data
     output_file = data_dir / "combined_data.json"
