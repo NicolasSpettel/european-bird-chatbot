@@ -8,6 +8,9 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            margin: 0; /* Reset default body margin */
+            padding: 0; /* Reset default body padding */
+            overflow: hidden; /* Prevent body scrollbar from showing when fixed elements are used */
         }
         .background-image {
             background-image: url('https://image.jimcdn.com/app/cms/image/transf/none/path/sa6549607c78f5c11/image/i085c7d187a56151e/version/1482853751/madeira-hummingbird-best-bird-watching-destinations-in-europe-copyright-lukasz-janyst-european-best-destinations-european-best-destinations.jpg');
@@ -22,11 +25,19 @@
             z-index: -1;
         }
         .chat-container {
-            max-width: 1200px;
+            /* Adjusted for new layout */
+            max-width: 1200px; /* Still keeps max width for the central content */
             height: 85vh;
             border-radius: 1rem;
             backdrop-filter: blur(5px);
             background-color: rgba(31, 41, 55, 0.6);
+            /* Centering the main chat content now, as sidebar is fixed */
+            margin: auto; 
+            display: flex; /* Ensure flex behavior */
+            flex-direction: row; /* Main layout is row */
+            gap: 6px; /* Reduced gap to fit sidebar */
+            padding: 20px; /* Added padding to main container */
+            position: relative; /* For absolute positioning of project info */
         }
         .message-input-container {
             backdrop-filter: blur(8px);
@@ -39,109 +50,250 @@
             background-color: #4b5563;
             border-radius: 10px;
         }
-        .bird-list-container {
-            height: 100%;
+        /* NEW: Bird list sidebar styles */
+        #bird-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px; /* Adjusted width */
+            background-color: rgba(31, 41, 55, 0.7); /* Match main container style */
+            padding: 20px;
             overflow-y: auto;
+            color: white; /* Ensure text is visible */
+            z-index: 10; /* Ensure it's above other content */
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5); /* Add a subtle shadow */
+            display: flex; /* Make it a flex container */
+            flex-direction: column; /* Stack children vertically */
         }
+        #bird-sidebar h2 {
+            margin-bottom: 1rem; /* Space below the new title */
+            font-size: 1.25rem; /* Tailwind text-xl */
+            font-weight: 700; /* Tailwind font-bold */
+        }
+        #bird-list-container {
+            flex-grow: 1; /* Allow the list to take available space */
+            overflow-y: auto; /* Ensure scrolling within the list */
+            padding-right: 10px; /* Add some padding for the scrollbar */
+        }
+
+        /* Adjust main content to not be hidden behind the sidebar */
+        .body-content-wrapper {
+            margin-left: 280px; /* Matches sidebar width */
+            flex-grow: 1; /* Allows it to take remaining horizontal space */
+            display: flex; /* To properly center the chat-container */
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Make sure it takes full height */
+            padding: 20px; /* Add padding to prevent content from touching edges */
+        }
+
+        /* Styling for the Project Information box */
+        #project-info-box {
+            position: absolute; /* Position it relative to chat-container */
+            bottom: 20px; /* Distance from the bottom */
+            right: 20px; /* Distance from the right */
+            width: 300px; /* Fixed width */
+            background-color: rgba(75, 85, 99, 0.7); /* Transparent background */
+            border-radius: 1rem;
+            padding: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: white;
+            z-index: 5; /* Ensure it's above main chat messages if they overlap */
+        }
+        #project-info-box h2 {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 1.25rem; /* Tailwind text-xl */
+            font-weight: 700; /* Tailwind font-bold */
+        }
+        #project-info-box p {
+            font-size: 0.875rem; /* Tailwind text-sm */
+            line-height: 1.5;
+        }
+
+        /* Adjusting the main chat and image/audio container to fill space */
+        .main-chat-area {
+            flex: 2; /* Main chat area takes more space */
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: transparent; /* Remove existing background to avoid double transparent effect */
+            border-radius: 1rem;
+            padding: 1rem;
+            box-shadow: none; /* Remove existing shadow as it's within chat-container */
+        }
+
+        .image-audio-info-area {
+            flex: 1; /* Image/Audio/Info area takes less space */
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: transparent; /* Remove existing background */
+            border-radius: 1rem;
+            padding: 1rem;
+            box-shadow: none; /* Remove existing shadow */
+            position: relative; /* For absolute positioning of project info */
+            justify-content: flex-start; /* Align content to the top */
+        }
+        .image-audio-info-area #image-container {
+            flex-grow: 0; /* Don't let image container grow too much */
+            max-height: 300px; /* Limit image height */
+            min-height: 200px;
+            margin-bottom: 1rem;
+        }
+        .image-audio-info-area #audio-player-container {
+            flex-shrink: 0; /* Don't let audio player shrink */
+        }
+
+
+        /* Ensure chat message area grows as needed */
+        #chat-messages {
+            flex-grow: 1;
+        }
+
+        /* Adjust the input container to not include the reset button */
+        .message-input-container {
+            display: flex;
+            align-items: center;
+            padding: 10px; /* Adjust padding */
+            background-color: rgba(255, 255, 255, 0.1); /* Slightly more visible input background */
+            border-radius: 9999px; /* Tailwind rounded-full */
+            margin-top: auto; /* Push to bottom of its flex container */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Positioning the reset button outside the input container */
+        #reset-memory-btn {
+            position: absolute;
+            right: 20px; /* Adjust as needed */
+            bottom: 20px; /* Adjust as needed */
+            z-index: 20; /* Ensure it's above other elements if needed */
+            width: 50px; /* Keep consistent size */
+            height: 50px;
+            background-color: rgba(253, 224, 71, 0.8); /* Tailwind yellow-300 with transparency */
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #reset-memory-btn:hover {
+            background-color: rgba(253, 224, 71, 1); /* Opaque on hover */
+            transform: scale(1.05); /* Slight grow effect */
+        }
+        #reset-status-message {
+            position: absolute;
+            right: 80px; /* Position next to the button */
+            bottom: 35px; /* Vertically align with button */
+            z-index: 20;
+            white-space: nowrap; /* Prevent text wrapping */
+        }
+
         .transparent-bg {
-            background-color: rgba(75, 85, 99, 0.6);
+            background-color: transparent; /* Changed to fully transparent for the inner panels to let chat-container background show through */
         }
+
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body class="flex min-h-screen">
     <div class="background-image"></div>
     
-    <div class="chat-container flex flex-col shadow-xl p-6 md:flex-row gap-6">
-
-        <div class="flex-1 flex flex-col h-full transparent-bg rounded-xl p-4 shadow-inner">
-            <h2 class="text-xl font-bold text-white mb-2">European Birds</h2>
-            <div id="bird-list-container" class="bird-list-container transparent-bg text-white rounded-lg p-2 shadow-inner">
+    <div id="bird-sidebar">
+        <h2 class="text-xl font-bold text-white mb-2">Click on a bird to learn about it</h2>
+        <div id="bird-list-container" class="bird-list-container text-white rounded-lg p-2 shadow-inner">
             </div>
-        </div>
+    </div>
 
-        <div class="flex-[2] flex flex-col h-full transparent-bg rounded-xl p-4 shadow-inner">
-            <h1 class="text-3xl font-extrabold text-white mb-4 text-center">Apollo, Bird Expert</h1>
+    <div class="body-content-wrapper">
+        <div class="chat-container flex flex-col shadow-xl p-6 md:flex-row gap-6">
 
-            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 p-2 mb-4 chat-messages">
-                <div class="flex justify-start">
-                    <div class="bg-gray-200/80 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words">
-                        <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-8 h-8 rounded-full">
-                        <span>Hello! I'm Apollo, your birdwatching expert in Europe. Ask me about a specific bird, or for general birdwatching tips.</span>
-                        <button class="tts-btn ml-2" title="Listen">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
+            <div class="main-chat-area flex-[2] flex flex-col h-full rounded-xl p-4">
+                <h1 class="text-3xl font-extrabold text-white mb-4 text-center">Apollo, Bird Expert</h1>
+
+                <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 p-2 mb-4 chat-messages">
+                    <div class="flex justify-start">
+                        <div class="bg-gray-200/80 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words">
+                            <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-8 h-8 rounded-full">
+                            <span>Hello! I'm Apollo, your birdwatching expert in Europe. Ask me about a specific bird, or for general birdwatching tips.</span>
+                            <button class="tts-btn ml-2" title="Listen">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div id="example-queries" class="flex flex-wrap justify-center gap-2 mb-4">
-                <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">What does a European Robin look like?</button>
-                <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">How can I attract birds to my garden?</button>
-            </div>
-
-            <div class="message-input-container flex items-center p-2 bg-white/50 rounded-full shadow-lg border border-gray-200">
-                <button id="mic-btn" class="flex items-center justify-center bg-red-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-red-600/80 focus:outline-none focus:ring-2 focus:ring-red-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-14 0v-2a7 7 0 0114 0v2zM12 21a9 9 0 01-9-9h18a9 9 0 01-9 9z" />
-                    </svg>
-                </button>
-                <input type="text" id="user-input" placeholder="Ask a question about birds..." class="flex-1 p-3 bg-transparent outline-none rounded-full text-gray-800">
-                <button id="send-btn" class="flex items-center justify-center bg-blue-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-blue-600/80 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <span id="send-btn-text" class="hidden">Send</span>
-                    <svg id="loading-spinner" class="animate-spin h-5 w-5 text-white" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <svg id="send-icon" class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                    </svg>
-                </button>
                 
-                <button id="reset-memory-btn" class="flex items-center justify-center bg-yellow-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-yellow-600/80 focus:outline-none focus:ring-2 focus:ring-yellow-400 ml-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m15.356 2H21v-2m-2.144 6A8.001 8.001 0 0119.418 15" />
-                    </svg>
-                </button>
+                <div id="example-queries" class="flex flex-wrap justify-center gap-2 mb-4">
+                    <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">What does a European Robin look like?</button>
+                    <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">How can I attract birds to my garden?</button>
+                </div>
+
+                <div class="message-input-container flex items-center p-2 rounded-full shadow-lg">
+                    <button id="mic-btn" class="flex items-center justify-center bg-red-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-red-600/80 focus:outline-none focus:ring-2 focus:ring-red-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-14 0v-2a7 7 0 0114 0v2zM12 21a9 9 0 01-9-9h18a9 9 0 01-9 9z" />
+                        </svg>
+                    </button>
+                    <input type="text" id="user-input" placeholder="Ask a question about birds..." class="flex-1 p-3 bg-transparent outline-none rounded-full text-white placeholder-gray-300">
+                    <button id="send-btn" class="flex items-center justify-center bg-blue-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-blue-600/80 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        <span id="send-btn-text" class="hidden">Send</span>
+                        <svg id="loading-spinner" class="animate-spin h-5 w-5 text-white" style="display: none;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <svg id="send-icon" class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="reset-status-message" class="mt-4 text-center text-sm font-medium"></div>
             </div>
             
-            <div id="reset-status-message" class="mt-4 text-center text-sm font-medium"></div>
-
-        </div>
-        
-        <div class="flex-1 flex flex-col h-full transparent-bg rounded-xl p-4 shadow-inner gap-4">
-            <div class="flex-1 flex flex-col items-center justify-center">
-                <h2 class="text-xl font-bold text-white mb-4">Bird Images</h2>
-                <div id="species-name" class="w-full text-center text-2xl font-semibold text-white mb-2">
-                    Species Name
-                </div>
-                <div id="image-container" class="w-full h-full flex items-center justify-center bg-gray-500/50 rounded-xl">
-                    <span class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
-                        Prepare for Bird images.
-                    </span>
-                </div>
-                <div id="audio-player-container" class="w-full mb-4" style="display: none;">
-                    <audio id="bird-audio-player" controls class="w-full">
-                        Your browser does not support the audio element.
-                    </audio>
-                </div>
-            </div>
-
-            <div class="flex-1 flex flex-col items-center justify-start p-4 transparent-bg rounded-xl shadow-inner text-white">
-                <h2 class="text-xl font-bold mb-4">Project Information</h2>
-                <div class="space-y-2 text-center text-sm">
-                    <p>This is a demonstration of a large language model acting as a domain-specific expert using a simple backend. The UI is built with Tailwind CSS.</p>
-                    <p>The backend is a simple Python server wrapped in a Docker container.</p>
-                    <p>
-                        <a href="https://github.com/NicolasSpettel/european-bird-chatbot" class="text-blue-300 underline hover:text-blue-200">GitHub</a> | 
-                        <a href="https://smith.langchain.com/o/da3774d7-02f4-436b-968e-e5e25bae8fb9/projects/p/a6ab4304-8a6c-4da3-b8c3-3b05fb5cdf3f?timeModel=%7B%22duration%22%3A%227d%22%7D" class="text-blue-300 underline hover:text-blue-200">LangSmith</a> |
-                        <a href="#" class="text-blue-300 underline hover:text-blue-200">LinkedIn</a>
-                    </p>
+            <div class="image-audio-info-area flex-1 flex flex-col h-full rounded-xl p-4 gap-4">
+                <div class="flex-0 flex flex-col items-center justify-center">
+                    <h2 class="text-xl font-bold text-white mb-4">Bird Images</h2>
+                    <div id="species-name" class="w-full text-center text-2xl font-semibold text-white mb-2">
+                        Species Name
+                    </div>
+                    <div id="image-container" class="w-full flex items-center justify-center bg-gray-500/50 rounded-xl overflow-hidden">
+                        <span class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
+                            Prepare for Bird images.
+                        </span>
+                    </div>
+                    <div id="audio-player-container" class="w-full mt-4" style="display: none;">
+                        <audio id="bird-audio-player" controls class="w-full">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+    
+    <div id="project-info-box">
+        <h2 class="text-xl font-bold mb-4">Project Information</h2>
+        <div class="space-y-2 text-center text-sm">
+            <p>This is a demonstration of a large language model acting as a domain-specific expert using a simple backend. The UI is built with Tailwind CSS.</p>
+            <p>The backend is a simple Python server wrapped in a Docker container.</p>
+            <p>
+                <a href="https://github.com/NicolasSpettel/european-bird-chatbot" class="text-blue-300 underline hover:text-blue-200">GitHub</a> | 
+                <a href="https://smith.langchain.com/o/da3774d7-02f4-436b-968e-e5e25bae8fb9/projects/p/a6ab4304-8a6c-4da3-b8c3-3b05fb5cdf3f?timeModel=%7B%22duration%22%3A%227d%22%7D" class="text-blue-300 underline hover:text-blue-200">LangSmith</a> |
+                <a href="#" class="text-blue-300 underline hover:text-blue-200">LinkedIn</a>
+            </p>
+        </div>
+    </div>
+
+    <button id="reset-memory-btn" title="Reset my memory if I talk nonsense">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m15.356 2H21v-2m-2.144 6A8.001 8.001 0 0119.418 15" />
+        </svg>
+    </button>
+
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -251,7 +403,7 @@
                 // Set the source and load the audio from your proxy
                 birdAudioPlayer.src = proxyUrl;
                 birdAudioPlayer.load();
-
+                // Removed birdAudioPlayer.play() to prevent autoplay
             } else {
                 // Hide the player if no audio URL is provided
                 audioPlayerContainer.style.display = 'none';
