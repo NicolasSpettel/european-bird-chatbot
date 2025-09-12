@@ -1,7 +1,8 @@
 import json
 import logging
 import re
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
+import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
 from src.agents.bird_qa_agent import BirdQAAgent
@@ -61,7 +62,7 @@ def reset_memory():
     except Exception as e:
         logger.error(f"Error resetting memory: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-    
+# The corrected route
 @app.route('/stream_audio', methods=['GET'])
 def stream_audio():
     audio_url = request.args.get('url')
@@ -69,18 +70,15 @@ def stream_audio():
         return "URL parameter missing", 400
 
     try:
-        # Stream the audio file from the external URL
-        response = requests.get(audio_url, stream=True)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        # Use requests to get the audio file with streaming enabled
+        req = requests.get(audio_url, stream=True)
+        req.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
 
-        # Set the correct content type and headers for streaming
-        return Response(
-            response.iter_content(chunk_size=1024),
-            mimetype=response.headers['Content-Type'],
-            headers={
-                'Content-Disposition': 'inline'  # Suggests browser should display the content
-            }
-        )
+        # Create a Flask Response object
+        # The generator expression `req.iter_content(...)` will stream the data
+        return Response(req.iter_content(chunk_size=1024), 
+                        mimetype=req.headers.get('Content-Type'))
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Error streaming audio from {audio_url}: {e}")
         return "Error streaming audio", 500

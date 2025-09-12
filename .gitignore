@@ -19,8 +19,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-/final_venv
-/fune_tuned_model
 
 # Virtual Environment
 venv/
@@ -50,6 +48,8 @@ logs/
 Thumbs.db
 
 # Project specific
+/final_venv
+/fine_tuned_model
 data/raw/
 data/processed/
 *.wav

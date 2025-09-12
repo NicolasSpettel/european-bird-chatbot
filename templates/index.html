@@ -240,44 +240,18 @@
             }
         };
 
-        const displayAudio = async (audioUrl) => {
+        const displayAudio = (audioUrl) => {
             if (audioUrl) {
-                audioPlayerContainer.style.display = 'block';
+                // Construct the new URL for your proxy endpoint
+                const proxyUrl = `/stream_audio?url=${encodeURIComponent(audioUrl)}`;
                 
-                // This check ensures we only apply the fix for the problematic URL structure
-                if (audioUrl.includes('xeno-canto.org') && audioUrl.endsWith('/download')) {
-                    try {
-                        const response = await fetch(audioUrl);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        // Get the file data as a binary blob
-                        const audioBlob = await response.blob();
-                        // Create a temporary URL for the blob
-                        const blobUrl = URL.createObjectURL(audioBlob);
+                // Show the audio player
+                audioPlayerContainer.style.display = 'block';
 
-                        // Assign the new blob URL to the audio player
-                        birdAudioPlayer.src = blobUrl;
-                        birdAudioPlayer.load();
+                // Set the source and load the audio from your proxy
+                birdAudioPlayer.src = proxyUrl;
+                birdAudioPlayer.load();
 
-                        // It's good practice to clean up the temporary URL to prevent memory leaks
-                        birdAudioPlayer.onended = () => {
-                            URL.revokeObjectURL(blobUrl);
-                        };
-                    } catch (error) {
-                        console.error("Error fetching or processing audio:", error);
-                        // Hide the audio player and show an alert on failure
-                        audioPlayerContainer.style.display = 'none';
-                        birdAudioPlayer.src = '';
-                        // Using a simple alert here because the original code used it.
-                        // For a better UX, a custom modal or message display is preferred.
-                        alert("Sorry, I couldn't load the audio file.");
-                    }
-                } else {
-                    // For other, non-problematic URLs, use the original approach
-                    birdAudioPlayer.src = audioUrl;
-                    birdAudioPlayer.load();
-                }
             } else {
                 // Hide the player if no audio URL is provided
                 audioPlayerContainer.style.display = 'none';
