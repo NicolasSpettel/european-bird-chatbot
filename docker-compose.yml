@@ -1,0 +1,24 @@
+# Use version 3 of the Docker Compose file format
+version: '3.8'
+
+# Define the services (your containers)
+services:
+  # The name of your service, changed from 'my-app' to 'bird-qa-agent'
+  bird-qa-agent:
+    # Use the `build` instruction to build an image from your Dockerfile
+    build: .
+    
+    # Map the ports from your container to your host machine.
+    # The format is HOST:CONTAINER. We map your local port 5000
+    # to the container's exposed port 5000.
+    ports:
+      - "5000:5000"
+      
+    # This is the most important part for fast development.
+    # It mounts your current directory into the container's working directory (/app).
+    # Any changes you make locally will be instantly reflected inside the container.
+    volumes:
+      - .:/app
+      
+    # The command to run your Flask web server
+    command: python app.py

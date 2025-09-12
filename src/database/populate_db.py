@@ -64,8 +64,6 @@ def populate_chromadb():
     
     chroma_client = ChromaClient()
 
-    # The warning "Collection [youtube] does not exists" is expected on the first run.
-    # It is safe to ignore. Deleting existing collections to avoid embedding function conflicts.
     chroma_client.delete_collection("birds")
     chroma_client.delete_collection("youtube")
     

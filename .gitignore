@@ -20,6 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 /final_venv
+/fune_tuned_model
 
 # Virtual Environment
 venv/

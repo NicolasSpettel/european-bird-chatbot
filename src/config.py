@@ -15,9 +15,12 @@ class Config:
     # Application Settings
     DEBUG = os.getenv("DEBUG", "True").lower() == "true"
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1000"))
+    MAX_TOKENS = int(os.getenv("MAX_TOKENS", "2000"))
     TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
     
+    # Fine-tuned model path
+    FINE_TUNED_MODEL_PATH = "Nicolas-Spettel/bird-qa-model"
+
     # European Countries for filtering
     EUROPEAN_COUNTRIES = [
         "United Kingdom", "Ireland", "France", "Spain", "Portugal", "Italy",

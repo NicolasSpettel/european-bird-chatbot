@@ -1,6 +1,6 @@
 import json
 import logging
-import re  # Add this import for regex
+import re
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -14,9 +14,27 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:5000"]}})
-bird_agent = BirdQAAgent()
+
+# Fix CORS - allow all origins for development
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 logger = logging.getLogger(__name__)
+
+# Initialize bird agent with error handling
+try:
+    bird_agent = BirdQAAgent()
+    logger.info("Bird QA Agent initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Bird QA Agent: {e}")
+    bird_agent = None
+
+
 
 def strip_markdown_links(text: str) -> str:
     """
@@ -31,30 +49,105 @@ def strip_markdown_links(text: str) -> str:
     text = ' '.join(text.split())
     return text
 
+@app.route('/reset_memory', methods=['POST'])
+def reset_memory():
+    if bird_agent is None:
+        return jsonify({'error': 'System not properly initialized'}), 500
+
+    try:
+        bird_agent.clear_memory()
+        logger.info("Memory reset via frontend button")
+        return jsonify({'status': 'success', 'message': 'Memory reset. Fresh start!'})
+    except Exception as e:
+        logger.error(f"Error resetting memory: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+@app.route('/stream_audio', methods=['GET'])
+def stream_audio():
+    audio_url = request.args.get('url')
+    if not audio_url:
+        return "URL parameter missing", 400
+
+    try:
+        # Stream the audio file from the external URL
+        response = requests.get(audio_url, stream=True)
+        response.raise_for_status()  # Raise an exception for bad status codes
+
+        # Set the correct content type and headers for streaming
+        return Response(
+            response.iter_content(chunk_size=1024),
+            mimetype=response.headers['Content-Type'],
+            headers={
+                'Content-Disposition': 'inline'  # Suggests browser should display the content
+            }
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error streaming audio from {audio_url}: {e}")
+        return "Error streaming audio", 500
+    
 @app.route('/')
 def home():
     return render_template('index.html')
 
 @app.route('/health')
 def health():
-    return "Backend is running!"
+    return jsonify({
+        "status": "healthy",
+        "agent_initialized": bird_agent is not None
+    })
 
 @app.route('/ask', methods=['POST'])
 def ask():
     print("=== NEW REQUEST ===")
-    user_input = request.json.get('message')
-    logger.info(f"Received text query: {user_input}")
+    
+    # Check if agent is initialized
+    if bird_agent is None:
+        return jsonify({
+            'response': 'Sorry, the system is not properly initialized. Please check the server logs.',
+            'image_url': '',
+            'audio_url': '',
+            'error': True
+        }), 500
+    
+    try:
+        data = request.get_json()
+        if not data or 'message' not in data:
+            return jsonify({
+                'response': 'No message provided',
+                'image_url': '',
+                'audio_url': '',
+                'error': True
+            }), 400
+            
+        user_input = data['message']
+        logger.info(f"Received text query: {user_input}")
 
-    # The agent is now responsible for returning a consistent dictionary.
-    response_data = bird_agent.ask(user_input)
-    logger.info(f"Agent response: {response_data}")
+        # The agent is now responsible for returning a consistent dictionary.
+        response_data = bird_agent.ask(user_input)
+        logger.info(f"Agent response: {response_data}")
 
-    # No need for complex if/elif logic here. Just jsonify the result.
-    # The agent has already done all the processing.
-    return jsonify(response_data)
+        return jsonify({
+            'response': response_data.get('answer', response_data.get('description', '')),
+            'image_url': response_data.get('image_url', ''),
+            'audio_url': response_data.get('audio_url', ''),
+            'species': response_data.get('species', ''),
+            'error': response_data.get('error', False)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing request: {e}")
+        return jsonify({
+            'answer': 'An internal server error occurred.',
+            'image_url': '',
+            'audio_url': '',
+            'error': True
+        }), 500
 
 @app.route('/ask_audio', methods=['POST'])
 def ask_audio():
+    if bird_agent is None:
+        return jsonify({'error': 'System not properly initialized'}), 500
+        
     if 'audio' not in request.files:
         return jsonify({'error': 'No audio file provided'}), 400
 
@@ -123,5 +216,14 @@ def ask_audio():
         logger.error(f"Error processing audio upload: {e}")
         return jsonify({'error': 'An internal error occurred'}), 500
 
+# Add error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

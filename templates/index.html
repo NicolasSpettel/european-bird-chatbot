@@ -56,7 +56,7 @@
         <div class="flex-1 flex flex-col h-full transparent-bg rounded-xl p-4 shadow-inner">
             <h2 class="text-xl font-bold text-white mb-2">European Birds</h2>
             <div id="bird-list-container" class="bird-list-container transparent-bg text-white rounded-lg p-2 shadow-inner">
-                </div>
+            </div>
         </div>
 
         <div class="flex-[2] flex flex-col h-full transparent-bg rounded-xl p-4 shadow-inner">
@@ -98,12 +98,24 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                     </svg>
                 </button>
+                
+                <button id="reset-memory-btn" class="flex items-center justify-center bg-yellow-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-yellow-600/80 focus:outline-none focus:ring-2 focus:ring-yellow-400 ml-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m15.356 2H21v-2m-2.144 6A8.001 8.001 0 0119.418 15" />
+                    </svg>
+                </button>
             </div>
+            
+            <div id="reset-status-message" class="mt-4 text-center text-sm font-medium"></div>
+
         </div>
         
         <div class="flex-1 flex flex-col h-full transparent-bg rounded-xl p-4 shadow-inner gap-4">
             <div class="flex-1 flex flex-col items-center justify-center">
                 <h2 class="text-xl font-bold text-white mb-4">Bird Images</h2>
+                <div id="species-name" class="w-full text-center text-2xl font-semibold text-white mb-2">
+                    Species Name
+                </div>
                 <div id="image-container" class="w-full h-full flex items-center justify-center bg-gray-500/50 rounded-xl">
                     <span class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
                         Prepare for Bird images.
@@ -143,9 +155,13 @@
         const exampleQueries = document.getElementById('example-queries');
         const birdListContainer = document.getElementById('bird-list-container');
         const micBtn = document.getElementById('mic-btn');
+        const speciesName = document.getElementById('species-name');
+        const resetButton = document.getElementById('reset-memory-btn');
+        const resetStatusMessage = document.getElementById('reset-status-message');
 
         const API_ENDPOINT = '/ask';
         const AUDIO_API_ENDPOINT = '/ask_audio';
+        const RESET_API_ENDPOINT = '/reset_memory';
 
         let isRecording = false;
         let mediaRecorder = null;
@@ -253,6 +269,8 @@
                         // Hide the audio player and show an alert on failure
                         audioPlayerContainer.style.display = 'none';
                         birdAudioPlayer.src = '';
+                        // Using a simple alert here because the original code used it.
+                        // For a better UX, a custom modal or message display is preferred.
                         alert("Sorry, I couldn't load the audio file.");
                     }
                 } else {
@@ -266,6 +284,7 @@
                 birdAudioPlayer.src = '';
             }
         };
+        
         const showLoading = () => {
             sendBtn.innerHTML = `
                 <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -379,25 +398,26 @@
 
                 const data = await response.json();
                 hideLoading();
-                
+
+                // Display species above image
+                const speciesName = document.getElementById('species-name');
+                speciesName.textContent = data.species ? data.species : '';
+
                 console.log('Backend response:', data); // Debug log
-                
                 // The response text should always be displayed in the chat
                 const messageText = data.response;
                 addMessage(messageText, 'bot');
-                
+
                 // Update image and audio only if URLs are provided
                 if (data.image_url) {
                     displayImage(data.image_url);
                 } else {
-                    // Clear image if no URL provided
                     displayImage('');
                 }
-                
+
                 if (data.audio_url) {
                     displayAudio(data.audio_url);
                 } else {
-                    // Clear audio if no URL provided
                     displayAudio('');
                 }
 
@@ -407,6 +427,36 @@
                 addMessage("Sorry, I couldn't connect to the server. Please check the backend.", 'bot');
             }
         };
+
+        // --- Memory Reset Functionality ---
+        const resetMemory = async () => {
+            resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-gray-400';
+            resetStatusMessage.textContent = 'Resetting memory...';
+            resetButton.disabled = true;
+
+            try {
+                const response = await fetch(RESET_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-green-400';
+                    resetStatusMessage.textContent = data.message;
+                } else {
+                    resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-red-400';
+                    resetStatusMessage.textContent = `Error: ${data.message}`;
+                }
+            } catch (error) {
+                resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-red-400';
+                resetStatusMessage.textContent = 'Failed to connect to the server. Please check your network connection.';
+            } finally {
+                resetButton.disabled = false;
+            }
+        };
+
 
         // --- Bird List and Examples ---
         const birds = ["Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Pintail", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Goldeneye", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter", "Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail", "Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe", "Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove", "Turtle Dove", "Common Cuckoo", "Nightjar", "Common Swift", "Pallid Swift", "Alpine Swift", "Water Rail", "Spotted Crake", "Corn Crake", "Moorhen", "Coot", "Common Crane", "Great Bustard", "Little Bustard", "Eurasian Oystercatcher", "Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover", "Grey Plover", "Dotterel", "Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit", "Whimbrel", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper", "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint", "Temminck's Stint", "Dunlin", "Ruff", "Avocet", "Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull", "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull", "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull", "Ivory Gull", "Glaucous Gull", "Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern", "White-winged Black Tern", "Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin", "White Stork", "Black Stork", "Great Bittern", "Little Bittern", "Grey Heron", "Purple Heron", "Great Egret", "Little Egret", "Cattle Egret", "Squacco Heron", "Night Heron", "Glossy Ibis", "Spoonbill", "Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle", "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk", "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon", "Merlin", "Hobby", "Peregrine Falcon", "Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl", "Little Owl", "Pygmy Owl", "Common Kingfisher", "Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker", "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker", "Woodlark", "Skylark", "Crested Lark", "Shore Lark", "Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow", "Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail", "Yellow Wagtail", "Waxwing", "White-throated Dipper", "Eurasian Wren", "Dunnock", "European Robin", "Common Nightingale", "Bluethroat", "Redstart", "Black Redstart", "Stonechat", "Whinchat", "Wheatear", "Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush", "Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler", "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler", "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat", "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler", "Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher", "Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit", "Eurasian Nuthatch", "Eurasian Treecreeper", "Short-toed Treecreeper", "Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike", "Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow", "Hooded Crow", "Raven", "European Starling", "Rose-coloured Starling", "House Sparrow", "Tree Sparrow", "Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Goldfinch", "Siskin", "Linnet", "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill", "Parrot Crossbill", "Bullfinch", "Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting", "Corn Bunting", "Lapland Bunting", "Snow Bunting", "Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe", "Hawfinch", "Wryneck"];
@@ -434,6 +484,8 @@
                 sendMessage();
             }
         });
+        resetButton.addEventListener('click', resetMemory);
+        
         renderBirdList();
     });
 </script>

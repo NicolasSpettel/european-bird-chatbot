@@ -14,6 +14,10 @@ def test_bird_agent():
     try:
         agent = BirdQAAgent()
         print("Agent initialized successfully")
+
+        # 🔥 Reset memory before testing
+        agent.clear_memory()
+        print("Agent memory reset.\n")
         
         # Test questions
         test_questions = [
@@ -45,3 +49,5 @@ def test_bird_agent():
 
 if __name__ == "__main__":
     test_bird_agent()
+
+

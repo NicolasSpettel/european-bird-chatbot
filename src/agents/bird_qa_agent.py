@@ -1,19 +1,18 @@
-
 import json
 import logging
-import os
-from typing import List, Dict, Any
 import re
+from typing import Dict, Any
+
 from langchain.agents import initialize_agent, AgentType
 from langchain.tools import BaseTool
 from langchain_openai import ChatOpenAI
-from langchain.schema import SystemMessage
-from langsmith import Client
 from langchain.memory import ConversationBufferMemory
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+from langchain.schema.agent import AgentFinish, AgentAction
 
 from src.database.chroma_client import ChromaClient
 from src.config import Config
-from src.tools.audio_processor import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -27,138 +26,90 @@ def strip_markdown_links(text: str) -> str:
     text = ' '.join(text.split())
     return text
 
+
 class BirdQueryTool(BaseTool):
     name: str = "bird_query"
     description: str = """Search for comprehensive information about a specific European bird species by name.
-
-    USE THIS TOOL WHEN:
-    - User asks about a specific bird's appearance, call, song, habitat, or other facts.
-    - User wants to know "what does a [bird species] sound like?", "what does a [bird species] look like?", or "tell me about a [bird species]".
-    - User provides a bird name and asks for any kind of detail about it.
-
-    INPUT: The bird species name (e.g., "european robin", "barn owl", "blue tit")
-    OUTPUT: A JSON object containing the bird's species name, a detailed description, a link to an image, and a link to an audio recording.
+    Input: The bird species name (e.g., "european robin", "barn owl", "blue tit").
+    Output: A JSON string with keys: species, description, image_url, audio_url.
     """
     chroma_client: ChromaClient
 
     def _run(self, query: str) -> str:
         try:
             logger.info(f"BirdQueryTool searching for: {query}")
-
             results = self.chroma_client.search(
                 collection_name="birds",
                 query=query,
                 n_results=1
             )
+            if results and results["documents"] and results["documents"][0]:
+                doc = results["documents"][0][0]
+                metadata = results["metadatas"][0][0]
+                species = metadata.get("species", "Unknown")
+                image_url = metadata.get("thumbnail", "")
+                audio_url = metadata.get("audio_url", "")
 
-            if results and results['documents'] and results['documents'][0]:
-                doc = results['documents'][0][0]
-                logger.info(f"Raw document content: {doc[:200]}")
-                metadata = results['metadatas'][0][0]
-
-                species = metadata.get('species', 'Unknown')
-                image_url = metadata.get('thumbnail', '')
-                audio_url = metadata.get('audio_url', '')
-
-                # Ensure the description does not contain any Markdown links
-                description = doc[:1000].replace('![](', '').replace(')','') if doc else "No description available."
+                description = (
+                    doc[:1000].replace("![](", "").replace(")", "")
+                    if doc else "No description available."
+                )
 
                 result_data = {
                     "species": species,
                     "description": description,
-                    "image_url": image_url if image_url else "",
-                    "audio_url": audio_url if audio_url else ""
+                    "image_url": image_url,
+                    "audio_url": audio_url,
                 }
-
                 formatted_output = json.dumps(result_data)
                 logger.info(f"BirdQueryTool returning: {formatted_output}")
                 return formatted_output
             else:
                 result_data = {
                     "species": "Unknown",
-                    "description": f"I couldn't find specific information about '{query}'. Try asking about a common European bird.",
+                    "description": f"I couldn't find information about '{query}'.",
                     "image_url": "",
-                    "audio_url": ""
+                    "audio_url": "",
                 }
                 return json.dumps(result_data)
-
         except Exception as e:
             logger.error(f"Bird query failed: {e}")
             result_data = {
                 "species": "Error",
-                "description": f"I encountered an error searching for '{query}'. Please try rephrasing your question.",
+                "description": f"Error searching for '{query}'.",
                 "image_url": "",
-                "audio_url": ""
+                "audio_url": "",
             }
             return json.dumps(result_data)
 
-        
-        except Exception as e:
-            logger.error(f"Bird query failed: {e}")
-            result_data = {
-                "species": "Error",
-                "description": f"I encountered an error searching for '{query}'. Please try rephrasing your question.",
-                "image_url": "",
-                "audio_url": ""
-            }
-            return json.dumps(result_data)
 
 class YouTubeQueryTool(BaseTool):
     name: str = "youtube_query"
     description: str = """Search YouTube educational content for birdwatching advice and techniques.
-
-    USE THIS TOOL WHEN:
-    - User asks for tips, techniques, or advice
-    - User wants equipment recommendations 
-    - User asks about birdwatching locations or communities
-    - User has "how to" questions about birdwatching
-    - User needs beginner guidance
-
-    INPUT: A birdwatching topic or question (e.g., "binocular recommendations", "bird photography tips")
-    OUTPUT: Summarized expert advice from educational videos"""
+    Input: User query (string).
+    Output: Plain text summary.
+    """
     chroma_client: ChromaClient
 
     def _run(self, query: str) -> str:
         try:
             logger.info(f"YouTubeQueryTool searching for: {query}")
-            
             results = self.chroma_client.search(
                 collection_name="youtube",
                 query=query,
                 n_results=3
             )
-            
-            if not results or not results['documents'] or not results['documents'][0]:
-                return json.dumps({
-                    "summary": f"I couldn't find YouTube content about '{query}'.",
-                    "video_count": 0,
-                    "video_urls": []
-                })
-            
-            documents = results['documents'][0]
-            metadatas = results['metadatas'][0]
-            
-            combined_content = "\n\n".join([f"From '{meta.get('title', 'Unknown Video')}': {doc[:500]}" 
-                                             for doc, meta in zip(documents, metadatas)])
-            
-            video_urls = [meta.get('url', '') for meta in metadatas if meta.get('url')]
-            
-            result = {
-                "summary": combined_content,
-                "video_count": len(documents),
-                "video_urls": video_urls[:2]
-            }
-            
-            logger.info(f"YouTubeQueryTool returning {len(documents)} videos")
-            return json.dumps(result)
-            
+            if results and results["documents"] and results["documents"][0]:
+                docs = results["documents"][0]
+                full_text = " ".join(docs)
+                description = strip_markdown_links(full_text[:1000]) if full_text else "No description available."
+                return description
+            else:
+                return "I couldn't find any expert advice on that topic."
         except Exception as e:
             logger.error(f"YouTube query failed: {e}")
-            return json.dumps({
-                "summary": f"I encountered an error searching for '{query}' on YouTube.",
-                "video_count": 0,
-                "video_urls": []
-            })
+            return f"Error searching for '{query}'."
+
 
 class BirdQAAgent:
     def __init__(self):
@@ -170,6 +121,17 @@ class BirdQAAgent:
         )
         self.setup_tools()
         self.setup_agent()
+        
+    def clear_memory(self):
+        """Reset the conversation memory so the agent forgets past context."""
+        try:
+            if hasattr(self, "memory") and self.memory is not None:
+                self.memory.clear()
+                logger.info("Agent memory cleared.")
+            else:
+                logger.warning("No memory found to clear.")
+        except Exception as e:
+            logger.error(f"Failed to clear memory: {e}")
 
     def setup_tools(self):
         self.tools = [
@@ -178,52 +140,76 @@ class BirdQAAgent:
         ]
 
     def setup_agent(self):
-        # Keep the system message simple, the logic for JSON output is now in `ask`.
-        system_message = SystemMessage(content="""You are a helpful European birdwatching expert assistant.
-        You have access to tools that can provide information about specific bird species and general birdwatching tips.
-        """)
-        
         self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-        self.agent = initialize_agent(
+        # Fix 1: Add `return_intermediate_steps=True` to get the tool outputs.
+        self.agent_executor = initialize_agent(
             tools=self.tools,
             llm=self.llm,
             agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
             verbose=True,
-            memory=self.memory
+            memory=self.memory,
+            return_intermediate_steps=True
         )
 
     def ask(self, question: str) -> Dict[str, Any]:
         try:
-            # 1. Invoke the agent to get a conversational response.
-            # The agent will get the data from the tool and then format it.
-            response = self.agent.invoke({"input": question})
-            raw_output = response['output']
+            # Step 1: Let agent run
+            # Fix 2: The invoke method now returns a dictionary with 'output' and 'intermediate_steps'
+            response = self.agent_executor.invoke({"input": question})
+            raw_output = response["output"]
+            intermediate_steps = response["intermediate_steps"]
 
-            # 2. Check the raw output for URLs.
-            # This is the key step: we extract the URLs first.
-            image_url_match = re.search(r'!\[.*?\]\((.*?)\)', raw_output)
-            audio_url_match = re.search(r'\[.*?\]\((.*?)\)', raw_output)
+            # Step 2: Search the intermediate steps for the tool's output
+            metadata = {}
+            for step in intermediate_steps:
+                action, observation = step
+                # Check if the tool's name is 'bird_query' and if the observation is a JSON string
+                if action.tool == "bird_query":
+                    try:
+                        metadata = json.loads(observation)
+                        break # Stop searching after finding the bird query tool output
+                    except json.JSONDecodeError:
+                        logger.warning(f"Could not parse JSON from tool output: {observation}")
             
-            image_url = image_url_match.group(1) if image_url_match else ""
-            audio_url = audio_url_match.group(1) if audio_url_match else ""
+            species = metadata.get("species", "")
+            image_url = metadata.get("image_url", "")
+            audio_url = metadata.get("audio_url", "")
+            description = metadata.get("description", "")
 
-            # 3. Clean the text from Markdown and common phrases.
-            # This makes sure the final 'answer' is chatty and clean.
-            clean_text = strip_markdown_links(raw_output)
+            # Step 3: Use LLM for friendly text from description only
+            if description and image_url and audio_url:
+                # Prompt the LLM to write a nice summary based ONLY on the description
+                prompt = PromptTemplate(
+                    input_variables=["desc"],
+                    template=(
+                        "You are a helpful European birdwatching expert. Based on this description, "
+                        "write a clear, concise, and friendly explanation about the bird. "
+                        "Do not include image, audio, or markdown links. Do not reference external tools. "
+                        "Focus on the content of the description itself.\n\n"
+                        "{desc}"
+                    )
+                )
+                chain = LLMChain(llm=self.llm, prompt=prompt)
+                answer_text = chain.run(desc=description)
+            else:
+                # If there's no structured data (e.g., for YouTube queries or general chat),
+                # use the raw output and clean it up.
+                answer_text = strip_markdown_links(raw_output)
 
-            # 4. Return the final, structured JSON.
             return {
-                "answer": clean_text,
+                "answer": answer_text.strip(),
+                "species": species,
                 "image_url": image_url,
                 "audio_url": audio_url,
-                "error": False
+                "error": False,
             }
 
         except Exception as e:
             logger.error(f"Agent error: {e}")
             return {
-                "answer": "I encountered a general error. Please try rephrasing your question.",
+                "answer": "I encountered a general error. Please try again.",
+                "species": "",
                 "image_url": "",
                 "audio_url": "",
-                "error": True
+                "error": True,
             }
