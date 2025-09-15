@@ -1,7 +1,9 @@
+# File: src/agents/bird_agent.py
+
 import json
 import logging
 import re
-from typing import Dict, Any
+from typing import Dict, Any, List
 from langchain.agents import initialize_agent, AgentType
 from langchain.tools import BaseTool
 from langchain_openai import ChatOpenAI
@@ -15,65 +17,68 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
-def strip_markdown_links(text: str) -> str:
-    """Remove Markdown links and images from text."""
-    text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
-    text = re.sub(r'Here is an image of .*?:?\s*', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'You can listen to its call\s*[^.]*\.', '', text, flags=re.IGNORECASE)
-    return ' '.join(text.split())
+def strip_markdown_links(text):
+    """Removes Markdown image links from a string."""
+    return re.sub(r'!\[.*?\]\((.*?)\)', '', text)
 
 class BirdQueryTool(BaseTool):
-    """Tool for querying bird species information from the Chroma database."""
+    """Tool for querying bird species information from the Chroma database. Handles both name and descriptive queries."""
     name: str = "bird_query"
     description: str = (
-        "Search for comprehensive information about a specific European bird species by name. "
-        "Input: The bird species name (e.g., 'european robin'). "
-        "Output: JSON with keys: species, description, image_url, audio_url."
+        "Search for comprehensive information about a specific bird species or a description of a bird. "
+        "Input: The bird species name (e.g., 'european robin') OR a descriptive phrase (e.g., 'a small bird with a red chest'). "
+        "Output: JSON list with keys: 'species', 'description', 'image_url', 'audio_url'."
     )
     chroma_client: ChromaClient
 
     def _run(self, query: str) -> str:
         """Execute the bird query and return structured results."""
         try:
-            logger.info(f"Searching for bird: {query}")
+            logger.info(f"Searching for bird with query: '{query}'")
+            
+            # Use the descriptive search to find top 3 relevant birds
             results = self.chroma_client.search(
                 collection_name="birds",
                 query=query,
-                n_results=1
+                n_results=3
             )
+            
             if not results or not results["documents"] or not results["documents"][0]:
-                return json.dumps({
-                    "species": "Unknown",
-                    "description": f"No information found for '{query}'.",
-                    "image_url": "",
-                    "audio_url": "",
-                })
+                return json.dumps([{"species": "Unknown", "description": f"No information found for '{query}'.", "image_url": "", "audio_url": ""}])
 
-            doc = results["documents"][0][0]
-            metadata = results["metadatas"][0][0]
-            species = metadata.get("species", "Unknown")
-            image_url = metadata.get("thumbnail", "")
-            audio_url = metadata.get("audio_url", "")
-            description = doc[:1000].replace("![](", "").replace(")", "") if doc else "No description available."
+            output_results = []
+            for i in range(len(results["documents"][0])):
+                doc = results["documents"][0][i]
+                metadata = results["metadatas"][0][i]
+                
+                species = metadata.get("species", "Unknown")
+                image_url = metadata.get("thumbnail", "")
+                audio_url = metadata.get("audio_url", "")
+                
+                # Truncate the description for cleaner output
+                description_part = doc.split("DETAILED_INFO:")[1].strip() if "DETAILED_INFO:" in doc else doc
+                description = description_part[:500].replace("![](", "").replace(")", "")
+                
+                result = {
+                    "species": species,
+                    "description": description,
+                    "image_url": image_url,
+                    "audio_url": audio_url,
+                }
+                output_results.append(result)
 
-            result = {
-                "species": species,
-                "description": description,
-                "image_url": image_url,
-                "audio_url": audio_url,
-            }
-            logger.info(f"Returning bird data: {result}")
-            return json.dumps(result)
+            logger.info(f"Returning bird data: {output_results}")
+            return json.dumps(output_results)
 
         except Exception as e:
             logger.error(f"Bird query failed: {e}")
-            return json.dumps({
+            return json.dumps([{
                 "species": "Error",
                 "description": f"Error searching for '{query}'.",
                 "image_url": "",
                 "audio_url": "",
-            })
+            }])
+
 
 class YouTubeQueryTool(BaseTool):
     """Tool for querying YouTube for birdwatching advice."""
@@ -96,9 +101,14 @@ class YouTubeQueryTool(BaseTool):
             if not results or not results["documents"] or not results["documents"][0]:
                 return "No expert advice found on this topic."
 
-            docs = results["documents"][0]
-            full_text = " ".join(docs)
-            return strip_markdown_links(full_text[:1000]) if full_text else "No advice available."
+            # Summarize the top 3 transcripts for the LLM
+            summaries = []
+            for i in range(len(results["documents"][0])):
+                doc = results["documents"][0][i]
+                metadata = results["metadatas"][0][i]
+                summaries.append(f"Video Title: {metadata.get('title', 'N/A')}\nTranscript excerpt: {doc[:300].strip()}...\nURL: {metadata.get('url', 'N/A')}")
+
+            return "\n\n---\n\n".join(summaries)
 
         except Exception as e:
             logger.error(f"YouTube query failed: {e}")
@@ -127,7 +137,6 @@ class BirdQAAgent:
             memory=self.memory,
             return_intermediate_steps=True
         )
-        # Store the last valid image and audio URLs
         self.last_image_url = ""
         self.last_audio_url = ""
 
@@ -161,18 +170,19 @@ class BirdQAAgent:
     def ask(self, user_query: str) -> Dict[str, Any]:
         """Answer a user's question about birds."""
         try:
-            # Step 1: Run the agent
             response = self.agent_executor.invoke({"input": user_query})
             raw_output = response["output"]
             intermediate_steps = response["intermediate_steps"]
 
-            # Step 2: Extract bird data from intermediate steps
             bird_data = {}
             for action, observation in intermediate_steps:
                 if action.tool == "bird_query":
                     try:
-                        bird_data = json.loads(observation)
-                        break
+                        # The tool now returns a list, so load it as such
+                        data_list = json.loads(observation)
+                        if data_list:
+                            bird_data = data_list[0]  # Get the top result for display
+                            break
                     except json.JSONDecodeError:
                         logger.warning(f"Failed to parse bird data: {observation}")
 
@@ -180,27 +190,37 @@ class BirdQAAgent:
             image_url = bird_data.get("image_url", "")
             audio_url = bird_data.get("audio_url", "")
             description = bird_data.get("description", "")
-
-            # Step 3: Validate the species match
-            if species and description:
+            
+            # New: Handle descriptive searches by formatting the LLM's raw output
+            if not species and "No information found" not in description:
+                # This path is for when the LLM uses the tool for a descriptive query
+                # but the raw output from the tool is complex.
+                # We'll re-prompt the LLM to format the response.
+                summary_prompt = PromptTemplate(
+                    input_variables=["user_query", "raw_output"],
+                    template=(
+                        "The user asked: '{user_query}'. "
+                        "The following information was found: {raw_output}. "
+                        "Synthesize this information into a clear and helpful response. "
+                        "Do not mention any tools or databases. "
+                        "If multiple birds are returned, mention a few of the top matches and describe them briefly. "
+                        "Prioritize the most relevant bird for the user's query."
+                    )
+                )
+                summary_chain = LLMChain(llm=self.llm, prompt=summary_prompt)
+                answer_text = summary_chain.run(user_query=user_query, raw_output=raw_output)
+            elif species:
+                # This path is for specific bird queries that get a clear result.
+                # It includes the validation logic.
                 is_match = self._validate_species_match(user_query, species)
                 if not is_match:
                     return {
-                        "answer": f"I couldn't find information about '{user_query}'. The database returned '{species}', which doesn't seem to match. Did you mean another bird?",
+                        "answer": f"I couldn't find information about '{user_query}'. The database returned '{species}', which doesn't seem to be a direct match. Did you mean another bird?",
                         "species": "",
-                        "image_url": self.last_image_url,  # Keep the last valid image
-                        "audio_url": self.last_audio_url,  # Keep the last valid audio
+                        "image_url": self.last_image_url,
+                        "audio_url": self.last_audio_url,
                         "error": False,
                     }
-
-            # Step 4: Update last valid image and audio URLs if new data is available
-            if image_url:
-                self.last_image_url = image_url
-            if audio_url:
-                self.last_audio_url = audio_url
-
-            # Step 5: Generate the answer
-            if species and description:
                 answer_prompt = PromptTemplate(
                     input_variables=["user_query", "species", "description"],
                     template=(
@@ -211,30 +231,20 @@ class BirdQAAgent:
                     )
                 )
                 answer_chain = LLMChain(llm=self.llm, prompt=answer_prompt)
-                answer_text = answer_chain.run(
-                    user_query=user_query,
-                    species=species,
-                    description=description
-                )
-            elif raw_output:
-                answer_prompt = PromptTemplate(
-                    input_variables=["user_query", "raw_output"],
-                    template=(
-                        "You are a birdwatching expert. The user asked: '{user_query}'. "
-                        "Based on this information: {raw_output}. "
-                        "Provide a clear, friendly answer. Do not mention tools or databases."
-                    )
-                )
-                answer_chain = LLMChain(llm=self.llm, prompt=answer_prompt)
-                answer_text = answer_chain.run(user_query=user_query, raw_output=raw_output)
+                answer_text = answer_chain.run(user_query=user_query, species=species, description=description)
+                
+                # Update last valid image and audio URLs if new data is available
+                if image_url: self.last_image_url = image_url
+                if audio_url: self.last_audio_url = audio_url
             else:
+                # Generic fallback for no results
                 answer_text = "I couldn't find relevant information. Could you rephrase or ask about a specific bird?"
-
+                
             return {
                 "answer": strip_markdown_links(answer_text).strip(),
                 "species": species,
-                "image_url": self.last_image_url,  # Always return the last valid image
-                "audio_url": self.last_audio_url,  # Always return the last valid audio
+                "image_url": self.last_image_url,
+                "audio_url": self.last_audio_url,
                 "error": False,
             }
 
@@ -243,10 +253,11 @@ class BirdQAAgent:
             return {
                 "answer": "I encountered an error. Please try again.",
                 "species": "",
-                "image_url": self.last_image_url,  # Keep the last valid image on error
-                "audio_url": self.last_audio_url,  # Keep the last valid audio on error
+                "image_url": self.last_image_url,
+                "audio_url": self.last_audio_url,
                 "error": True,
             }
+
     def process_audio_bytes(self, audio_bytes: bytes, filename: str) -> Dict[str, Any]:
         """
         Process audio bytes using OpenAI Whisper and return the transcription.
@@ -258,33 +269,22 @@ class BirdQAAgent:
         """
         try:
             logger.info(f"Processing audio file: {filename}")
-
-            # Save the audio bytes to a temporary file
             temp_path = "temp_audio.mp3"
             with open(temp_path, "wb") as f:
                 f.write(audio_bytes)
             logger.info(f"Saved temporary audio file: {temp_path}")
-
-            # Initialize the OpenAI client
             client = OpenAI(api_key=Config.OPENAI_API_KEY)
-
-            # Use the new API for transcription
             with open(temp_path, "rb") as audio_file:
                 transcription = client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio_file
                 )
-
-            # Clean up the temporary file
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-
-            # Return the transcription as a response
             return {
                 "transcription": transcription.text,
                 "error": False
             }
-
         except Exception as e:
             logger.error(f"Error transcribing audio: {e}")
             return {

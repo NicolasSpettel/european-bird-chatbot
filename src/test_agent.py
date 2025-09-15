@@ -21,8 +21,8 @@ def test_bird_agent():
         
         # Test questions
         test_questions = [
-            "i want to know something about the mute swan",
-            "do you like birds?",
+            "tell me about the mute swan",
+            "what bird has white feathers and orange beak?",
         ]
         
         print("\nTesting agent with questions:")

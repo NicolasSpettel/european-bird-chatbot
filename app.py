@@ -6,6 +6,7 @@ import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
 from src.agents.bird_qa_agent import BirdQAAgent
+import os
 
 # Load environment variables from .env file
 load_dotenv()
@@ -35,8 +36,6 @@ except Exception as e:
     logger.error(f"Failed to initialize Bird QA Agent: {e}")
     bird_agent = None
 
-
-
 def strip_markdown_links(text: str) -> str:
     """
     Strip Markdown image and link syntax from text.
@@ -62,16 +61,22 @@ def reset_memory():
     except Exception as e:
         logger.error(f"Error resetting memory: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-# The corrected route
+    
 @app.route('/stream_audio', methods=['GET'])
 def stream_audio():
     audio_url = request.args.get('url')
     if not audio_url:
         return "URL parameter missing", 400
+    
+    # Use a more robust security check with startswith()
+    allowed_domains = ('https://xeno-canto.org/',)
+    if not audio_url.startswith(allowed_domains):
+        logger.warning(f"Unauthorized URL access attempt: {audio_url}")
+        return "Unauthorized URL", 403
 
     try:
-        # Use requests to get the audio file with streaming enabled
-        req = requests.get(audio_url, stream=True)
+        # Use requests to get the audio file with streaming enabled and a timeout
+        req = requests.get(audio_url, stream=True, timeout=10)
         req.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
 
         # Create a Flask Response object

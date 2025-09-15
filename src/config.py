@@ -8,6 +8,7 @@ class Config:
     # API Keys
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
+    EBIRD_API_KEY = os.getenv("EBIRD_API_KEY")
     
     # Database
     CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./data/chroma_db")

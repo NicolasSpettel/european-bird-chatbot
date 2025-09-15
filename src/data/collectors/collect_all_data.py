@@ -1,308 +1,113 @@
-import sys
-import os
 import json
 import logging
-import traceback
+import time
 from pathlib import Path
-from datetime import datetime
 
-# Ensure imports work from src/
-# Assuming bird_collector.py is the correct module name for SimpleWikipediaCollector
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+# Assuming these are correctly imported or defined in your project
+from src.data.collectors.bird_collector import ComprehensiveBirdCollector
+from src.data.collectors.youtube_collector import YouTubeTranscriptCollector # assuming the YouTube class is in this path
 
-from src.data.collectors.bird_collector import SimpleWikipediaCollector
-from src.data.collectors.youtube_collector import YouTubeTranscriptCollector
-
-logging.basicConfig(level=logging.INFO)
+# Set up logging for better visibility
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# European birds for the chatbot
-EUROPEAN_BIRDS = [
-    # Waterfowl
-    "Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose",
-    "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Pintail", "Shoveler", "Pochard",
-    "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Goldeneye", "Smew", "Red-breasted Merganser",
-    "Goosander", "Velvet Scoter",
+# --- Correctly find the project root for file paths ---
+current_dir = Path(__file__).resolve().parent
+PROJECT_ROOT = current_dir.parent.parent.parent
 
-    # Pheasants, Partridges, and Quails
-    "Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail",
+def get_european_bird_list(file_path: Path) -> list:
+    """Reads the list of European birds from the text file."""
+    bird_list = []
+    try:
+        with file_path.open('r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    # Split the line by comma and then clean each name
+                    names_on_line = line.split(',')
+                    for name in names_on_line:
+                        name = name.strip()
+                        if name.startswith('"') and name.endswith('"'):
+                            bird_name = name.strip('"')
+                            bird_list.append(bird_name)
+                        elif name:
+                            logger.warning(f"Skipping improperly formatted name: {name}")
+    except FileNotFoundError:
+        logger.error(f"Error: The bird list file {file_path} was not found.")
+        return []
+    return bird_list
 
-    # Grebes
-    "Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe",
+def collect_and_save_bird_data():
+    """
+    Collects comprehensive bird data for a predefined list of European birds
+    and saves it to a JSON file.
+    """
+    logger.info("Starting bird data collection.")
 
-    # Pigeons and Doves
-    "Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove", "Turtle Dove",
+    # Use the pre-calculated PROJECT_ROOT to find the files
+    bird_list_path = PROJECT_ROOT / 'docs' / 'list_of_birds.txt'
+    output_path = PROJECT_ROOT / 'data' / 'raw' / 'combined_data.json'
 
-    # Cuckoos
-    "Common Cuckoo",
-
-    # Nightjars
-    "Nightjar",
-
-    # Swifts
-    "Common Swift", "Pallid Swift", "Alpine Swift",
-
-    # Rails, Crakes, and Coots
-    "Water Rail", "Spotted Crake", "Corn Crake", "Moorhen", "Coot",
-
-    # Cranes
-    "Common Crane",
-
-    # Bustards
-    "Great Bustard", "Little Bustard",
-
-    # Oystercatchers
-    "Eurasian Oystercatcher",
-
-    # Plovers
-    "Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover",
-    "Grey Plover", "Dotterel",
-
-    # Sandpipers and Snipes
-    "Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit",
-    "Whimbrel", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper",
-    "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint",
-    "Temminck's Stint", "Dunlin", "Ruff", "Avocet",
-
-    # Skuas and Gulls
-    "Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull",
-    "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull",
-    "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull",
-    "Ivory Gull", "Glaucous Gull",
-
-    # Terns
-    "Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern",
-    "White-winged Black Tern",
-
-    # Auks
-    "Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin",
-
-    # Storks
-    "White Stork", "Black Stork",
-
-    # Herons, Egrets, and Bitterns
-    "Great Bittern", "Little Bittern", "Grey Heron", "Purple Heron", "Great Egret", "Little Egret",
-    "Cattle Egret", "Squacco Heron", "Night Heron",
-
-    # Ibises and Spoonbills
-    "Glossy Ibis", "Spoonbill",
-
-    # Birds of Prey
-    "Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle",
-    "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk",
-    "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon",
-    "Merlin", "Hobby", "Peregrine Falcon",
-
-    # Owls
-    "Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl",
-    "Little Owl", "Pygmy Owl",
-
-    # Kingfishers
-    "Common Kingfisher",
-
-    # Woodpeckers
-    "Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker",
-    "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker",
-
-    # Larks
-    "Woodlark", "Skylark", "Crested Lark", "Shore Lark",
-
-    # Swallows and Martins
-    "Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow",
-
-    # Pipits and Wagtails
-    "Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail",
-    "Yellow Wagtail",
-
-    # Waxwings
-    "Waxwing",
-
-    # Dippers
-    "White-throated Dipper",
-
-    # Wrens
-    "Eurasian Wren",
-
-    # Accentors
-    "Dunnock",
-
-    # Robins and Chats
-    "European Robin", "Common Nightingale", "Bluethroat", "Redstart", "Black Redstart",
-    "Stonechat", "Whinchat", "Wheatear",
-
-    # Thrushes
-    "Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush",
-
-    # Warblers
-    "Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler",
-    "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler",
-    "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat",
-    "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler",
-
-    # Flycatchers
-    "Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher",
-
-    # Tits
-    "Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit",
-
-    # Nuthatches
-    "Eurasian Nuthatch",
-
-    # Treecreepers
-    "Eurasian Treecreeper", "Short-toed Treecreeper",
-
-    # Shrikes
-    "Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike",
-
-    # Crows and Allies
-    "Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow",
-    "Hooded Crow", "Raven",
-
-    # Starlings
-    "European Starling", "Rose-coloured Starling",
-
-    # Sparrows
-    "House Sparrow", "Tree Sparrow",
-
-    # Finches
-    "Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Goldfinch", "Siskin", "Linnet",
-    "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill",
-    "Parrot Crossbill", "Bullfinch",
-
-    # Buntings
-    "Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting",
-    "Corn Bunting", "Lapland Bunting", "Snow Bunting",
-
-    # Miscellaneous (removed duplicates)
-    "Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe",
-]
-
-
-YOUTUBE_VIDEOS = [
-    {
-        "url": "https://www.youtube.com/watch?v=1RK4Nx4i924",
-        "category": "beginners_guide",
-    },
-        {
-        "url": "https://www.youtube.com/watch?v=hK30ObyJt6M",
-        "category": "beginners_guide",
-    },
-        {
-        "url": "https://www.youtube.com/watch?v=uuY_7i040ug",
-        "category": "beginners_guide",
-    },
-        {
-        "url": "https://www.youtube.com/watch?v=js4Ir0ExlYQ",
-        "category": "photography_guide",
-    },
-
-]
-
-def chunk_text(text: str, chunk_size: int = 1400, overlap: int = 100):
-    chunks = []
-    start = 0
-    text_length = len(text)
-    while start < text_length:
-        end = start + chunk_size
-        chunk = text[start:end]
-        chunks.append(chunk.strip())
-        if end >= text_length:
-            break
-        start = end - overlap
-    return chunks
-
-
-
-def process_youtube_data(video_data, doc_id):
-    """Process YouTube video data into chunks"""
-    transcript = video_data.get('transcript', '')
-    logger.info(f"Transcript length: {len(transcript)}")
-    if not transcript or len(transcript) < 100:
-        return [], [], []
-
-    # Split transcript into smaller chunks
-    # no more than 1million characters
-    transcript = transcript[:1000000]
-    chunks = chunk_text(transcript, chunk_size=1400, overlap=100)
-
-    documents = []
-    metadatas = []
-    ids = []
-
-    for i, chunk in enumerate(chunks):
-        doc_text = f"{video_data.get('title','')}\n\n"
-        if video_data.get('author'):
-            doc_text += f"Author: {video_data['author']}\n\n"
-        doc_text += f"Transcript (part {i+1}): {chunk}"
-
-        metadata = {
-            'title': video_data['title'],
-            'author': video_data.get('author', ''),
-            'category': video_data.get('category', 'birdwatching'),
-            'source': 'YouTube',
-            'url': video_data['url'],
-            'video_id': video_data['video_id'],
-            'chunk_index': i,
-            'type': 'youtube_content'
-        }
-
-        documents.append(doc_text)
-        metadatas.append(metadata)
-        ids.append(f"youtube_{doc_id:03d}_chunk_{i:03d}")
-
-    return documents, metadatas, ids
-
-
-def collect_all_data():
-    """Collect both Wikipedia and YouTube data and process them."""
-    wiki_collector = SimpleWikipediaCollector()
+    # Initialize collectors
+    bird_collector = ComprehensiveBirdCollector()
     youtube_collector = YouTubeTranscriptCollector()
 
-    data_dir = Path("data/raw")
-    data_dir.mkdir(parents=True, exist_ok=True)
+    bird_names = get_european_bird_list(bird_list_path)
+    if not bird_names:
+        logger.error("No bird names found in the list. Exiting.")
+        return
 
-    all_data = []
-    doc_id_counter = 0
+    all_bird_data = []
 
-    # Collect Wikipedia data
-    for bird_name in EUROPEAN_BIRDS:
+    # --- Step 1: Collect Wikipedia Data ---
+    logger.info("Collecting Wikipedia and audio data...")
+    for name in bird_names:
+        logger.info(f"Collecting data for {name}...")
         try:
-            bird_data = wiki_collector.collect_bird_data(bird_name)
+            bird_data = bird_collector.collect_bird_data(name)
             if bird_data:
-                bird_data["type"] = "wikipedia_bird"
-                all_data.append(bird_data)
+                bird_data['type'] = 'wikipedia_bird_full'
+                all_bird_data.append(bird_data)
         except Exception as e:
-            logger.error(f"Failed to collect Wikipedia data for {bird_name}: {e}")
+            logger.error(f"Failed to collect data for {name}: {e}")
 
-    for video in YOUTUBE_VIDEOS:
+        time.sleep(1)
+
+    logger.info(f"Finished collecting data for {len(all_bird_data)} birds from Wikipedia.")
+    
+    # --- Step 2: Collect YouTube Data ---
+    logger.info("Collecting YouTube video data...")
+    
+    # List of YouTube URLs to collect transcripts from.
+    youtube_urls = [
+        "https://www.youtube.com/watch?v=DSIhFy6tlvI",
+        "https://www.youtube.com/watch?v=NW9MVJmoRqQ",
+        "https://www.youtube.com/watch?v=1RK4Nx4i924",
+        "https://www.youtube.com/watch?v=hN7926wHsLk",
+        "https://www.youtube.com/watch?v=NQoYVNAmpqE",
+        "https://www.youtube.com/watch?v=WyB0QuFGiYU",
+        "https://www.youtube.com/watch?v=22CzenMh5_k",
+        "https://www.youtube.com/watch?v=TtATNKwUzg0"
+    ]
+    
+    for url in youtube_urls:
+        logger.info(f"Collecting YouTube data for URL: {url}...")
         try:
-            logger.info(f"Processing YouTube video: {video['url']}")
-            video_data = youtube_collector.collect_video_data(
-                video["url"], video.get("category", "birdwatching")
-            )
-            if not video_data:
-                logger.warning(f"No data collected for: {video['url']}")
-                continue
-            documents, metadatas, ids = process_youtube_data(video_data, doc_id_counter)
-            doc_id_counter += 1
-            for doc_text, metadata, doc_id in zip(documents, metadatas, ids):
-                all_data.append({
-                    "id": doc_id,
-                    "content": doc_text,
-                    "metadata": metadata,
-                    "type": "youtube_chunk"
-                })
+            video_data = youtube_collector.collect_video_data(url)
+            if video_data:
+                all_bird_data.append(video_data)
         except Exception as e:
-            logger.error(f"Failed to collect YouTube data for {video['url']}: {e}\n{traceback.format_exc()}")
+            logger.error(f"Failed to collect YouTube data for {url}: {e}")
+            
+    logger.info(f"Finished collecting YouTube video data.")
 
-    # Save combined data
-    output_file = data_dir / "combined_data.json"
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(all_data, f, indent=2, ensure_ascii=False)
-
-    logger.info(f"Saved {len(all_data)} records to {output_file}")
-    return all_data
-
+    # --- Step 3: Save all collected data ---
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(all_bird_data, f, indent=4)
+        logger.info(f"Successfully saved combined data to {output_path}")
+    except IOError as e:
+        logger.error(f"Failed to save data to file: {e}")
 
 if __name__ == "__main__":
-    collected_data = collect_all_data()
+    collect_and_save_bird_data()

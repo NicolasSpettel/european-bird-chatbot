@@ -585,34 +585,91 @@
 
 
         // --- Bird List and Examples ---
-        const birds = ["Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Pintail", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Goldeneye", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter", "Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail", "Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe", "Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove", "Turtle Dove", "Common Cuckoo", "Nightjar", "Common Swift", "Pallid Swift", "Alpine Swift", "Water Rail", "Spotted Crake", "Corn Crake", "Moorhen", "Coot", "Common Crane", "Great Bustard", "Little Bustard", "Eurasian Oystercatcher", "Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover", "Grey Plover", "Dotterel", "Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit", "Whimbrel", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper", "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint", "Temminck's Stint", "Dunlin", "Ruff", "Avocet", "Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull", "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull", "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull", "Ivory Gull", "Glaucous Gull", "Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern", "White-winged Black Tern", "Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin", "White Stork", "Black Stork", "Great Bittern", "Little Bittern", "Grey Heron", "Purple Heron", "Great Egret", "Little Egret", "Cattle Egret", "Squacco Heron", "Night Heron", "Glossy Ibis", "Spoonbill", "Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle", "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk", "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon", "Merlin", "Hobby", "Peregrine Falcon", "Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl", "Little Owl", "Pygmy Owl", "Common Kingfisher", "Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker", "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker", "Woodlark", "Skylark", "Crested Lark", "Shore Lark", "Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow", "Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail", "Yellow Wagtail", "Waxwing", "White-throated Dipper", "Eurasian Wren", "Dunnock", "European Robin", "Common Nightingale", "Bluethroat", "Redstart", "Black Redstart", "Stonechat", "Whinchat", "Wheatear", "Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush", "Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler", "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler", "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat", "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler", "Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher", "Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit", "Eurasian Nuthatch", "Eurasian Treecreeper", "Short-toed Treecreeper", "Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike", "Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow", "Hooded Crow", "Raven", "European Starling", "Rose-coloured Starling", "House Sparrow", "Tree Sparrow", "Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Goldfinch", "Siskin", "Linnet", "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill", "Parrot Crossbill", "Bullfinch", "Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting", "Corn Bunting", "Lapland Bunting", "Snow Bunting", "Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe", "Hawfinch", "Wryneck"];
-        
-        const renderBirdList = () => {
-            birds.forEach(bird => {
-                const birdButton = document.createElement('button');
-                birdButton.classList.add('block', 'w-full', 'px-4', 'py-2', 'mb-1', 'bg-gray-700/60', 'text-white', 'rounded-lg', 'text-left', 'hover:bg-gray-600/60', 'transition', 'duration-200', 'ease-in-out');
-                birdButton.textContent = bird;
-                birdListContainer.appendChild(birdButton);
-            });
+        const birdsByCategory = {
+            "Waterfowl": ["Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter"],
+            "Pheasants, Partridges, and Quails": ["Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail"],
+            "Grebes": ["Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe"],
+            "Pigeons and Doves": ["Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove"],
+            "Cuckoos": ["Common Cuckoo"],
+            "Nightjars": ["Nightjar"],
+            "Swifts": ["Common Swift", "Pallid Swift", "Alpine Swift"],
+            "Rails, Crakes, and Coots": ["Water Rail", "Spotted Crake", "Corn Crake", "Moorhen", "Coot"],
+            "Cranes": ["Common Crane"],
+            "Bustards": ["Great Bustard", "Little Bustard"],
+            "Oystercatchers": ["Eurasian Oystercatcher"],
+            "Plovers": ["Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover", "Grey Plover", "Dotterel"],
+            "Sandpipers and Snipes": ["Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper", "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint", "Temminck's Stint", "Dunlin", "Ruff", "Avocet"],
+            "Skuas and Gulls": ["Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull", "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull", "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull", "Ivory Gull", "Glaucous Gull"],
+            "Terns": ["Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern", "White-winged Black Tern"],
+            "Auks": ["Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin"],
+            "Storks": ["White Stork", "Black Stork"],
+            "Herons, Egrets, and Bitterns": ["Great Bittern", "Little Bittern", "Grey Heron", "Purple Heron", "Great Egret", "Little Egret", "Cattle Egret", "Squacco Heron", "Night Heron"],
+            "Ibises and Spoonbills": ["Glossy Ibis", "Spoonbill"],
+            "Birds of Prey": ["Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle", "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk", "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon", "Merlin", "Hobby", "Peregrine Falcon"],
+            "Owls": ["Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl", "Little Owl", "Pygmy Owl"],
+            "Kingfishers": ["Common Kingfisher"],
+            "Woodpeckers": ["Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker", "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker"],
+            "Larks": ["Woodlark", "Skylark", "Crested Lark", "Shore Lark"],
+            "Swallows and Martins": ["Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow"],
+            "Pipits and Wagtails": ["Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail", "Yellow Wagtail"],
+            "Waxwings": ["Waxwing"],
+            "Dippers": ["White-throated Dipper"],
+            "Wrens": ["Eurasian Wren"],
+            "Accentors": ["Dunnock"],
+            "Robins and Chats": ["European Robin", "Common Nightingale", "Bluethroat", "Redstart", "Black Redstart", "Stonechat", "Whinchat", "Wheatear"],
+            "Thrushes": ["Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush"],
+            "Warblers": ["Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler", "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler", "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat", "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler"],
+            "Flycatchers": ["Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher"],
+            "Tits": ["Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit"],
+            "Nuthatches": ["Eurasian Nuthatch"],
+            "Treecreepers": ["Eurasian Treecreeper", "Short-toed Treecreeper"],
+            "Shrikes": ["Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike"],
+            "Crows and Allies": ["Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow", "Hooded Crow", "Raven"],
+            "Starlings": ["European Starling", "Rose-coloured Starling"],
+            "Sparrows": ["House Sparrow", "Tree Sparrow"],
+            "Finches": ["Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Siskin", "Linnet", "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill", "Parrot Crossbill", "Bullfinch"],
+            "Buntings": ["Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting", "Corn Bunting", "Lapland Bunting", "Snow Bunting"],
+            "Miscellaneous": ["Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe"]
         };
-        
-        sendBtn.addEventListener('click', sendMessage);
-        userInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') sendMessage(); });
-        exampleQueries.addEventListener('click', (event) => {
-            if (event.target.tagName === 'BUTTON') {
-                userInput.value = event.target.textContent.trim();
-                sendMessage();
+        const renderBirdList = () => {
+            for (const category in birdsByCategory) {
+                if (birdsByCategory.hasOwnProperty(category)) {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.classList.add('category-container', 'mb-2');
+
+                    const categoryButton = document.createElement('button');
+                    categoryButton.classList.add('category-button', 'block', 'w-full', 'px-4', 'py-2', 'bg-gray-700/60', 'text-white', 'rounded-lg', 'text-left', 'hover:bg-gray-600/60', 'transition', 'duration-200', 'ease-in-out', 'flex', 'justify-between', 'items-center');
+                    categoryButton.innerHTML = `<span>${category}</span><span class="category-icon">+</span>`;
+
+                    const birdListDiv = document.createElement('div');
+                    birdListDiv.classList.add('bird-list', 'hidden', 'pl-4', 'pt-2');
+
+                    birdsByCategory[category].forEach(bird => {
+                        const birdButton = document.createElement('button');
+                        birdButton.classList.add('bird-button', 'block', 'w-full', 'px-4', 'py-2', 'mb-1', 'bg-gray-700/40', 'text-white', 'rounded-lg', 'text-left', 'hover:bg-gray-600/40', 'transition', 'duration-200', 'ease-in-out');
+                        birdButton.textContent = bird;
+                        birdListDiv.appendChild(birdButton);
+                    });
+
+                    categoryDiv.appendChild(categoryButton);
+                    categoryDiv.appendChild(birdListDiv);
+                    birdListContainer.appendChild(categoryDiv);
+
+                    categoryButton.addEventListener('click', () => {
+                        birdListDiv.classList.toggle('hidden');
+                        const icon = categoryButton.querySelector('.category-icon');
+                        icon.textContent = birdListDiv.classList.contains('hidden') ? '+' : '-';
+                    });
+                }
             }
-        });
+        };
+
         birdListContainer.addEventListener('click', (event) => {
-            if (event.target.tagName === 'BUTTON') {
+            if (event.target.tagName === 'BUTTON' && event.target.classList.contains('bird-button')) {
                 userInput.value = event.target.textContent.trim();
                 sendMessage();
             }
         });
-        resetButton.addEventListener('click', resetMemory);
-        
-        renderBirdList();
     });
 </script>
 </body>

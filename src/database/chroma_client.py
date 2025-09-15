@@ -10,8 +10,6 @@ from src.config import Config
 
 logger = logging.getLogger(__name__)
 
-# The path to your fine-tuned model directory
-
 class ChromaClient:
     def __init__(self):
 
@@ -38,7 +36,7 @@ class ChromaClient:
         try:
             collection = self.client.get_or_create_collection(
                 name=collection_name,
-                embedding_function=self.embedding_function, # Correctly pass the instance variable
+                embedding_function=self.embedding_function,
                 metadata=metadata or {"description": f"{collection_name} collection"},
             )
             return collection
@@ -67,7 +65,6 @@ class ChromaClient:
     def search(self, collection_name: str, query: str, n_results: int = 5):
         """Search in specified collection"""
         try:
-            # Use get_or_create_collection to ensure consistent embedding function
             collection = self.get_or_create_collection(collection_name)
             results = collection.query(
                 query_texts=[query],

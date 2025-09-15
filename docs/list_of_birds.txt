@@ -1,7 +1,7 @@
-# Waterfowl
+    # Waterfowl
     "Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose",
-    "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Pintail", "Shoveler", "Pochard",
-    "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Goldeneye", "Smew", "Red-breasted Merganser",
+    "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard",
+    "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser",
     "Goosander", "Velvet Scoter",
 
     # Pheasants, Partridges, and Quails
@@ -11,7 +11,7 @@
     "Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe",
 
     # Pigeons and Doves
-    "Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove", "Turtle Dove",
+    "Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove",
 
     # Cuckoos
     "Common Cuckoo",
@@ -40,9 +40,9 @@
 
     # Sandpipers and Snipes
     "Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit",
-    "Whimbrel", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper",
+    "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper",
     "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint",
-    "Temminck's Stint", "Dunlin", "Ruff", "Avocet",
+    "Temminck's Stint", "Dunlin", "Avocet",
 
     # Skuas and Gulls
     "Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull",
@@ -145,7 +145,7 @@
     "House Sparrow", "Tree Sparrow",
 
     # Finches
-    "Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Goldfinch", "Siskin", "Linnet",
+    "Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Siskin", "Linnet",
     "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill",
     "Parrot Crossbill", "Bullfinch",
 
