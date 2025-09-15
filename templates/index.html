@@ -40,6 +40,7 @@
         .message-input-container {
             backdrop-filter: blur(8px);
         }
+        
         .chat-messages::-webkit-scrollbar {
             width: 8px;
         }
@@ -203,7 +204,7 @@
     <div class="body-content-wrapper">
         <div class="chat-container flex flex-col shadow-xl p-6 md:flex-row gap-6">
 
-            <div class="main-chat-area flex-[2] flex flex-col h-full rounded-xl p-4">
+            <div class="main-chat-area flex-[3] flex flex-col h-full rounded-xl p-4">
                 <h1 class="text-3xl font-extrabold text-white mb-4 text-center">Apollo, Bird Expert</h1>
 
                 <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 p-2 mb-4 chat-messages">
@@ -242,20 +243,9 @@
             </div>
             
             <div class="image-audio-info-area flex-1 flex flex-col h-full rounded-xl p-4 gap-4">
-                <div class="flex-0 flex flex-col items-center justify-center">
-                    <h2 class="text-xl font-bold text-white mb-4">Bird Images</h2>
-                    <div id="species-name" class="w-full text-center text-2xl font-semibold text-white mb-2">
-                        Species Name
-                    </div>
-                    <div id="image-container" class="w-full flex items-center justify-center bg-gray-500/50 rounded-xl overflow-hidden">
-                        <span class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
-                            Prepare for Bird images.
-                        </span>
-                    </div>
-                    <div id="audio-player-container" class="w-full mt-4" style="display: none;">
-                        <audio id="bird-audio-player" controls class="w-full">
-                            Your browser does not support the audio element.
-                        </audio>
+                <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-inner">
+                    <h3 class="text-xl font-bold text-white mb-4">Bird Images</h2>
+                    <div id="multi-bird-display" class="flex flex-col gap-6 mt-6">
                     </div>
                 </div>
             </div>
@@ -282,380 +272,379 @@
     </button>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const chatMessages = document.getElementById('chat-messages');
-        const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const loadingSpinner = document.getElementById('loading-spinner'); // This is not used, can be removed.
-        const imageContainer = document.getElementById('image-container');
-        const audioPlayerContainer = document.getElementById('audio-player-container');
-        const birdAudioPlayer = document.getElementById('bird-audio-player');
-        const exampleQueries = document.getElementById('example-queries');
-        const birdListContainer = document.getElementById('bird-list-container');
-        const micBtn = document.getElementById('mic-btn');
-        const speciesName = document.getElementById('species-name');
-        const resetButton = document.getElementById('reset-memory-btn');
-        const resetStatusMessage = document.getElementById('reset-status-message');
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatMessages = document.getElementById('chat-messages');
+            const userInput = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
+            const exampleQueries = document.getElementById('example-queries');
+            const birdListContainer = document.getElementById('bird-list-container');
+            const micBtn = document.getElementById('mic-btn');
+            const resetButton = document.getElementById('reset-memory-btn');
+            const resetStatusMessage = document.getElementById('reset-status-message');
+            const multiBirdDisplay = document.getElementById('multi-bird-display');
 
-        const API_ENDPOINT = '/ask';
-        const AUDIO_API_ENDPOINT = '/ask_audio';
-        const RESET_API_ENDPOINT = '/reset_memory';
+            const API_ENDPOINT = '/ask';
+            const AUDIO_API_ENDPOINT = '/ask_audio';
+            const RESET_API_ENDPOINT = '/reset_memory';
 
-        let isRecording = false;
-        let mediaRecorder = null;
-        let audioChunks = [];
+            let isRecording = false;
+            let mediaRecorder = null;
+            let audioChunks = [];
 
-        // Simple Markdown parser for links and images
-        const parseMarkdown = (text) => {
-            text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
-                return `<a href="${url}" target="_blank" class="text-blue-300 hover:text-blue-200 underline">${linkText}</a>`;
-            });
-            text = text.replace(/\n/g, '<br>');
-            return text;
-        };
+            // Simple Markdown parser for links and images
+            const parseMarkdown = (text) => {
+                text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+                    return `<a href="${url}" target="_blank" class="text-blue-300 hover:text-blue-200 underline">${linkText}</a>`;
+                });
+                text = text.replace(/\n/g, '<br>');
+                return text;
+            };
 
-        const addMessage = (text, sender, transcription = null) => {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('flex', 'mb-4');
-            const messageContent = document.createElement('div');
-            messageContent.classList.add('p-4', 'rounded-xl', 'max-w-[80%]', 'break-words');
+            const addMessage = (text, sender, transcription = null) => {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('flex', 'mb-4');
+                const messageContent = document.createElement('div');
+                messageContent.classList.add('p-4', 'rounded-xl', 'max-w-[80%]', 'break-words');
 
-            let finalContent = transcription ? `<strong>(Transcription)</strong><br>${text}` : text;
-            const parsedText = parseMarkdown(finalContent);
+                let finalContent = transcription ? `<strong>(Transcription)</strong><br>${text}` : text;
+                const parsedText = parseMarkdown(finalContent);
 
-            if (sender === 'user') {
-                messageDiv.classList.add('justify-end');
-                messageContent.classList.add('bg-blue-400/80', 'text-white');
-                messageContent.innerHTML = parsedText;
-                messageDiv.appendChild(messageContent);
-            } else {
-                messageDiv.classList.add('justify-start');
-                messageContent.classList.add('bg-gray-200/80', 'text-gray-800', 'flex', 'items-center', 'space-x-2');
-                messageContent.innerHTML = `
-                    <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-8 h-8 rounded-full">
-                    <span>${parsedText}</span>
-                    <button class="tts-btn ml-2" title="Listen">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                `;
-                messageDiv.appendChild(messageContent);
-                
-                const ttsButton = messageDiv.querySelector('.tts-btn');
-                if (ttsButton) {
-                    ttsButton.addEventListener('click', () => speakMessage(text));
+                if (sender === 'user') {
+                    messageDiv.classList.add('justify-end');
+                    messageContent.classList.add('bg-blue-400/80', 'text-white');
+                    messageContent.innerHTML = parsedText;
+                    messageDiv.appendChild(messageContent);
+                } else {
+                    messageDiv.classList.add('justify-start');
+                    messageContent.classList.add('bg-gray-200/80', 'text-gray-800', 'flex', 'items-center', 'space-x-2');
+                    messageContent.innerHTML = `
+                        <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-8 h-8 rounded-full">
+                        <span>${parsedText}</span>
+                        <button class="tts-btn ml-2" title="Listen">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    `;
+                    messageDiv.appendChild(messageContent);
+                    
+                    const ttsButton = messageDiv.querySelector('.tts-btn');
+                    if (ttsButton) {
+                        ttsButton.addEventListener('click', () => speakMessage(text));
+                    }
                 }
-            }
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        };
-        
-        const displayImage = (imageUrl) => {
-            if (imageUrl && imageUrl.trim() !== '') {
-                console.log('Displaying image:', imageUrl);
-                imageContainer.innerHTML = '';
-                const imgElement = document.createElement('img');
-                imgElement.src = imageUrl;
-                imgElement.alt = "Bird image from Wikipedia";
-                imgElement.classList.add('w-full', 'h-auto', 'object-contain', 'rounded-xl', 'shadow');
-                imageContainer.appendChild(imgElement);
-            } else {
-                console.log('No image URL provided, showing placeholder');
-                imageContainer.innerHTML = `<span class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
-                    Ask about a specific bird to see its image.
-                </span>`;
-            }
-        };
-
-        const displayAudio = (audioUrl) => {
-            if (audioUrl) {
-                const proxyUrl = `/stream_audio?url=${encodeURIComponent(audioUrl)}`;
-                audioPlayerContainer.style.display = 'block';
-                birdAudioPlayer.src = proxyUrl;
-                birdAudioPlayer.load();
-            } else {
-                audioPlayerContainer.style.display = 'none';
-                birdAudioPlayer.src = '';
-            }
-        };
-        
-        const showLoading = () => {
-            sendBtn.innerHTML = `
-                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>`;
-            sendBtn.disabled = true;
-            userInput.disabled = true;
-        };
-
-        const hideLoading = () => {
-            sendBtn.innerHTML = `
-                <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                </svg>`;
-            sendBtn.disabled = false;
-            userInput.disabled = false;
-        };
-
-        const speakMessage = (text) => {
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                window.speechSynthesis.speak(utterance);
-            } else {
-                console.warn("Text-to-Speech API is not supported in this browser.");
-            }
-        };
-        
-        micBtn.addEventListener('click', async () => {
-            if (isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                micBtn.classList.remove('bg-red-600/80');
-                micBtn.classList.add('bg-red-500/80');
-            } else {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-                    mediaRecorder.onstop = () => sendAudioMessage(new Blob(audioChunks, { type: 'audio/wav' }));
-                    mediaRecorder.start();
-                    isRecording = true;
-                    micBtn.classList.remove('bg-red-500/80');
-                    micBtn.classList.add('bg-red-600/80');
-                } catch (err) {
-                    console.error('Error accessing microphone:', err);
-                    alert('Microphone access denied. Please enable it to use this feature.');
-                }
-            }
-        });
-
-        const sendAudioMessage = async (audioBlob) => {
-            showLoading();
-            const formData = new FormData();
-            formData.append('audio', audioBlob, 'audio.wav');
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            };
             
-            try {
-                const response = await fetch(AUDIO_API_ENDPOINT, {
-                    method: 'POST',
-                    body: formData,
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
-                hideLoading();
-                
-                if (data.transcription) {
-                    addMessage(data.transcription, 'user', true);
-                }
+            const showLoading = () => {
+                sendBtn.innerHTML = `
+                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>`;
+                sendBtn.disabled = true;
+                userInput.disabled = true;
+            };
 
-                const messageText = data.response;
-                addMessage(messageText, 'bot');
-                
-                if (data.image_url) {
-                    displayImage(data.image_url);
-                }
-                
-                if (data.audio_url) {
-                    displayAudio(data.audio_url);
-                }
+            const hideLoading = () => {
+                sendBtn.innerHTML = `
+                    <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>`;
+                sendBtn.disabled = false;
+                userInput.disabled = false;
+            };
 
-            } catch (error) {
-                console.error('Error fetching bot response with audio:', error);
-                hideLoading();
-                addMessage("Sorry, I couldn't process the audio. Please check your backend.", 'bot');
-            }
-        };
-
-        const sendMessage = async () => {
-            const message = userInput.value.trim();
-            if (!message) return;
-
-            addMessage(message, 'user');
-            userInput.value = '';
-            showLoading();
-
-            try {
-                const response = await fetch(API_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message }),
-                });
-
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-                const data = await response.json();
-                hideLoading();
-
-                const speciesNameEl = document.getElementById('species-name');
-                speciesNameEl.textContent = data.species ? data.species : '';
-
-                console.log('Backend response:', data);
-                const messageText = data.response;
-                addMessage(messageText, 'bot');
-
-                if (data.image_url) {
-                    displayImage(data.image_url);
+            const speakMessage = (text) => {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    window.speechSynthesis.speak(utterance);
                 } else {
-                    displayImage('');
+                    console.warn("Text-to-Speech API is not supported in this browser.");
                 }
-
-                if (data.audio_url) {
-                    displayAudio(data.audio_url);
+            };
+            
+            micBtn.addEventListener('click', async () => {
+                if (isRecording) {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    micBtn.classList.remove('bg-red-600/80');
+                    micBtn.classList.add('bg-red-500/80');
                 } else {
-                    displayAudio('');
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+                        mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                        mediaRecorder.onstop = () => sendAudioMessage(new Blob(audioChunks, { type: 'audio/wav' }));
+                        mediaRecorder.start();
+                        isRecording = true;
+                        micBtn.classList.remove('bg-red-500/80');
+                        micBtn.classList.add('bg-red-600/80');
+                    } catch (err) {
+                        console.error('Error accessing microphone:', err);
+                        alert('Microphone access denied. Please enable it to use this feature.');
+                    }
                 }
-
-            } catch (error) {
-                console.error('Error fetching bot response:', error);
-                hideLoading();
-                addMessage("Sorry, I couldn't connect to the server. Please check the backend.", 'bot');
-            }
-        };
-
-        const resetMemory = async () => {
-            resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-gray-400';
-            resetStatusMessage.textContent = 'Resetting memory...';
-            resetButton.disabled = true;
-
-            try {
-                const response = await fetch(RESET_API_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-green-400';
-                    resetStatusMessage.textContent = data.message;
-                } else {
-                    resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-red-400';
-                    resetStatusMessage.textContent = `Error: ${data.message}`;
-                }
-            } catch (error) {
-                resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-red-400';
-                resetStatusMessage.textContent = 'Failed to connect to the server. Please check your network connection.';
-            } finally {
-                resetButton.disabled = false;
-                // Clear the message after 3 seconds
-                setTimeout(() => {
-                    resetStatusMessage.textContent = '';
-                }, 3000);
-            }
-        };
-
-        // --- Bird List and Examples ---
-        const birdsByCategory = {
-            "Waterfowl": ["Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter"],
-            "Pheasants, Partridges, and Quails": ["Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail"],
-            "Grebes": ["Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe"],
-            "Pigeons and Doves": ["Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove"],
-            "Cuckoos": ["Common Cuckoo"],
-            "Nightjars": ["Nightjar"],
-            "Swifts": ["Common Swift", "Pallid Swift", "Alpine Swift"],
-            "Rails, Crakes, and Coots": ["Water Rail", "Spotted Crake", "Corn Crake", "Moorhen", "Coot"],
-            "Cranes": ["Common Crane"],
-            "Bustards": ["Great Bustard", "Little Bustard"],
-            "Oystercatchers": ["Eurasian Oystercatcher"],
-            "Plovers": ["Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover", "Grey Plover", "Dotterel"],
-            "Sandpipers and Snipes": ["Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper", "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint", "Temminck's Stint", "Dunlin", "Ruff", "Avocet"],
-            "Skuas and Gulls": ["Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull", "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull", "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull", "Ivory Gull", "Glaucous Gull"],
-            "Terns": ["Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern", "White-winged Black Tern"],
-            "Auks": ["Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin"],
-            "Storks": ["White Stork", "Black Stork"],
-            "Herons, Egrets, and Bitterns": ["Great Bittern", "Little Bittern", "Grey Heron", "Purple Heron", "Great Egret", "Little Egret", "Cattle Egret", "Squacco Heron", "Night Heron"],
-            "Ibises and Spoonbills": ["Glossy Ibis", "Spoonbill"],
-            "Birds of Prey": ["Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle", "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk", "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon", "Merlin", "Hobby", "Peregrine Falcon"],
-            "Owls": ["Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl", "Little Owl", "Pygmy Owl"],
-            "Kingfishers": ["Common Kingfisher"],
-            "Woodpeckers": ["Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker", "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker"],
-            "Larks": ["Woodlark", "Skylark", "Crested Lark", "Shore Lark"],
-            "Swallows and Martins": ["Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow"],
-            "Pipits and Wagtails": ["Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail", "Yellow Wagtail"],
-            "Waxwings": ["Waxwing"],
-            "Dippers": ["White-throated Dipper"],
-            "Wrens": ["Eurasian Wren"],
-            "Accentors": ["Dunnock"],
-            "Robins and Chats": ["European Robin", "Common Nightingale", "Bluethroat", "Redstart", "Black Redstart", "Stonechat", "Whinchat", "Wheatear"],
-            "Thrushes": ["Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush"],
-            "Warblers": ["Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler", "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler", "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat", "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler"],
-            "Flycatchers": ["Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher"],
-            "Tits": ["Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit"],
-            "Nuthatches": ["Eurasian Nuthatch"],
-            "Treecreepers": ["Eurasian Treecreeper", "Short-toed Treecreeper"],
-            "Shrikes": ["Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike"],
-            "Crows and Allies": ["Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow", "Hooded Crow", "Raven"],
-            "Starlings": ["European Starling", "Rose-coloured Starling"],
-            "Sparrows": ["House Sparrow", "Tree Sparrow"],
-            "Finches": ["Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Siskin", "Linnet", "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill", "Parrot Crossbill", "Bullfinch"],
-            "Buntings": ["Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting", "Corn Bunting", "Lapland Bunting", "Snow Bunting"],
-            "Miscellaneous": ["Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe"]
-        };
-        
-        const renderBirdList = () => {
-            for (const category in birdsByCategory) {
-                if (birdsByCategory.hasOwnProperty(category)) {
-                    const categoryDiv = document.createElement('div');
-                    categoryDiv.classList.add('category-container', 'mb-2');
-
-                    const categoryButton = document.createElement('button');
-                    categoryButton.classList.add('category-button', 'block', 'w-full', 'px-4', 'py-2', 'bg-gray-700/60', 'text-white', 'rounded-lg', 'text-left', 'hover:bg-gray-600/60', 'transition', 'duration-200', 'ease-in-out', 'flex', 'justify-between', 'items-center');
-                    categoryButton.innerHTML = `<span>${category}</span><span class="category-icon">+</span>`;
-
-                    const birdListDiv = document.createElement('div');
-                    birdListDiv.classList.add('bird-list', 'hidden', 'pl-4', 'pt-2');
-
-                    birdsByCategory[category].forEach(bird => {
-                        const birdButton = document.createElement('button');
-                        birdButton.classList.add('bird-button', 'block', 'w-full', 'px-4', 'py-2', 'mb-1', 'bg-gray-700/40', 'text-white', 'rounded-lg', 'text-left', 'hover:bg-gray-600/40', 'transition', 'duration-200', 'ease-in-out');
-                        birdButton.textContent = bird;
-                        birdListDiv.appendChild(birdButton);
-                    });
-
-                    categoryDiv.appendChild(categoryButton);
-                    categoryDiv.appendChild(birdListDiv);
-                    birdListContainer.appendChild(categoryDiv);
-
-                    categoryButton.addEventListener('click', () => {
-                        birdListDiv.classList.toggle('hidden');
-                        const icon = categoryButton.querySelector('.category-icon');
-                        icon.textContent = birdListDiv.classList.contains('hidden') ? '+' : '-';
-                    });
-                }
-            }
-        };
-
-        // Event listeners
-        sendBtn.addEventListener('click', sendMessage);
-
-        userInput.addEventListener('keypress', (event) => {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
-        });
-        
-        birdListContainer.addEventListener('click', (event) => {
-            if (event.target.tagName === 'BUTTON' && event.target.classList.contains('bird-button')) {
-                userInput.value = event.target.textContent.trim();
-                sendMessage();
-            }
-        });
-
-        // Combined example queries listener
-        document.querySelectorAll('#example-queries button').forEach(button => {
-            button.addEventListener('click', () => {
-                userInput.value = button.textContent.trim();
-                sendMessage();
             });
-        });
 
-        resetButton.addEventListener('click', resetMemory);
-        
-        // Initial rendering of the bird list
-        renderBirdList();
-    });
-</script>
+            const sendAudioMessage = async (audioBlob) => {
+                showLoading();
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'audio.wav');
+                
+                try {
+                    const response = await fetch(AUDIO_API_ENDPOINT, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const data = await response.json();
+                    hideLoading();
+                    
+                    if (data.transcription) {
+                        addMessage(data.transcription, 'user', true);
+                    }
+
+                    const messageText = data.response;
+                    addMessage(messageText, 'bot');
+                    
+                } catch (error) {
+                    console.error('Error fetching bot response with audio:', error);
+                    hideLoading();
+                    addMessage("Sorry, I couldn't process the audio. Please check your backend.", 'bot');
+                }
+            };
+
+            const sendMessage = async () => {
+                const message = userInput.value.trim();
+                if (!message) return;
+
+                addMessage(message, 'user');
+                userInput.value = '';
+                showLoading();
+
+                try {
+                    const response = await fetch(API_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: message }),
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                    const data = await response.json();
+                    hideLoading();
+
+                    const messageText = data.response; 
+                    addMessage(messageText, 'bot');
+                    
+                    multiBirdDisplay.innerHTML = '';
+
+
+                    if (data.birds && data.birds.length > 0) {
+                        // Limit to the first 2 birds
+                        data.birds.slice(0, 2).forEach(bird => {
+                            const birdCard = document.createElement('div');
+                            birdCard.classList.add(
+                                'bg-gray-700/60',
+                                'p-4',
+                                'rounded-xl',
+                                'shadow-lg',
+                                'text-white',
+                                'flex',
+                                'flex-col',
+                                'items-center',
+                                'space-y-4'
+                            );
+
+                            // Create species name heading
+                            const speciesNameEl = document.createElement('h3');
+                            speciesNameEl.classList.add('text-lg', 'font-bold');
+                            speciesNameEl.textContent = bird.species;
+                            birdCard.appendChild(speciesNameEl);
+
+                            // Create image element
+                            if (bird.image_url) {
+                                const imgElement = document.createElement('img');
+                                imgElement.src = bird.image_url;
+                                imgElement.alt = `Image of a ${bird.species}`;
+                                imgElement.classList.add('w-full', 'h-auto', 'object-cover', 'rounded-xl', 'shadow');
+                                birdCard.appendChild(imgElement);
+                            }
+
+                            // Create audio player
+                            if (bird.audio_url) {
+                                const audioEl = document.createElement('audio');
+                                audioEl.classList.add('w-full');
+                                audioEl.setAttribute('controls', '');
+                                const audioSource = document.createElement('source');
+                                audioSource.src = `/stream_audio?url=${encodeURIComponent(bird.audio_url)}`;
+                                audioSource.type = 'audio/mpeg';
+                                audioEl.appendChild(audioSource);
+                                birdCard.appendChild(audioEl);
+                            }
+
+                            multiBirdDisplay.appendChild(birdCard);
+                        });
+                    } else {
+                        // Display a message if no birds are found in the structured data
+                        multiBirdDisplay.innerHTML = `<p class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
+                            No bird data found for this query.
+                        </p>`;
+                    }
+                    // --- END of MODIFIED LOGIC ---
+
+                } catch (error) {
+                    console.error('Error fetching bot response:', error);
+                    hideLoading();
+                    addMessage("Sorry, I couldn't connect to the server. Please check the backend.", 'bot');
+                }
+            };
+
+            const resetMemory = async () => {
+                resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-gray-400';
+                resetStatusMessage.textContent = 'Resetting memory...';
+                resetButton.disabled = true;
+
+                try {
+                    const response = await fetch(RESET_API_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-green-400';
+                        resetStatusMessage.textContent = data.message;
+                    } else {
+                        resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-red-400';
+                        resetStatusMessage.textContent = `Error: ${data.message}`;
+                    }
+                } catch (error) {
+                    resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-red-400';
+                    resetStatusMessage.textContent = 'Failed to connect to the server. Please check your network connection.';
+                } finally {
+                    resetButton.disabled = false;
+                    // Clear the message after 3 seconds
+                    setTimeout(() => {
+                        resetStatusMessage.textContent = '';
+                    }, 3000);
+                }
+            };
+
+            // --- Bird List and Examples ---
+            const birdsByCategory = {
+                "Waterfowl": ["Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter"],
+                "Pheasants, Partridges, and Quails": ["Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail"],
+                "Grebes": ["Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe"],
+                "Pigeons and Doves": ["Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove"],
+                "Cuckoos": ["Common Cuckoo"],
+                "Nightjars": ["Nightjar"],
+                "Swifts": ["Common Swift", "Pallid Swift", "Alpine Swift"],
+                "Rails, Crakes, and Coots": ["Water Rail", "Spotted Crake", "Corn Crake", "Moorhen", "Coot"],
+                "Cranes": ["Common Crane"],
+                "Bustards": ["Great Bustard", "Little Bustard"],
+                "Oystercatchers": ["Eurasian Oystercatcher"],
+                "Plovers": ["Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover", "Grey Plover", "Dotterel"],
+                "Sandpipers and Snipes": ["Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper", "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint", "Temminck's Stint", "Dunlin", "Ruff", "Avocet"],
+                "Skuas and Gulls": ["Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull", "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull", "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull", "Ivory Gull", "Glaucous Gull"],
+                "Terns": ["Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern", "White-winged Black Tern"],
+                "Auks": ["Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin"],
+                "Storks": ["White Stork", "Black Stork"],
+                "Herons, Egrets, and Bitterns": ["Great Bittern", "Little Bittern", "Grey Heron", "Purple Heron", "Great Egret", "Little Egret", "Cattle Egret", "Squacco Heron", "Night Heron"],
+                "Ibises and Spoonbills": ["Glossy Ibis", "Spoonbill"],
+                "Birds of Prey": ["Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle", "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk", "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon", "Merlin", "Hobby", "Peregrine Falcon"],
+                "Owls": ["Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl", "Little Owl", "Pygmy Owl"],
+                "Kingfishers": ["Common Kingfisher"],
+                "Woodpeckers": ["Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker", "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker"],
+                "Larks": ["Woodlark", "Skylark", "Crested Lark", "Shore Lark"],
+                "Swallows and Martins": ["Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow"],
+                "Pipits and Wagtails": ["Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail", "Yellow Wagtail"],
+                "Waxwings": ["Waxwing"],
+                "Dippers": ["White-throated Dipper"],
+                "Wrens": ["Eurasian Wren"],
+                "Accentors": ["Dunnock"],
+                "Robins and Chats": ["European Robin", "Common Nightingale", "Bluethroat", "Redstart", "Black Redstart", "Stonechat", "Whinchat", "Wheatear"],
+                "Thrushes": ["Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush"],
+                "Warblers": ["Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler", "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler", "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat", "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler"],
+                "Flycatchers": ["Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher"],
+                "Tits": ["Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit"],
+                "Nuthatches": ["Eurasian Nuthatch"],
+                "Treecreepers": ["Eurasian Treecreeper", "Short-toed Treecreeper"],
+                "Shrikes": ["Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike"],
+                "Crows and Allies": ["Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow", "Hooded Crow", "Raven"],
+                "Starlings": ["European Starling", "Rose-coloured Starling"],
+                "Sparrows": ["House Sparrow", "Tree Sparrow"],
+                "Finches": ["Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Siskin", "Linnet", "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill", "Parrot Crossbill", "Bullfinch"],
+                "Buntings": ["Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting", "Corn Bunting", "Lapland Bunting", "Snow Bunting"],
+                "Miscellaneous": ["Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe"]
+            };
+            
+            const renderBirdList = () => {
+                for (const category in birdsByCategory) {
+                    if (birdsByCategory.hasOwnProperty(category)) {
+                        const categoryDiv = document.createElement('div');
+                        categoryDiv.classList.add('category-container', 'mb-2');
+
+                        const categoryButton = document.createElement('button');
+                        categoryButton.classList.add('category-button', 'block', 'w-full', 'px-4', 'py-2', 'bg-gray-700/60', 'text-white', 'rounded-lg', 'text-left', 'hover:bg-gray-600/60', 'transition', 'duration-200', 'ease-in-out', 'flex', 'justify-between', 'items-center');
+                        categoryButton.innerHTML = `<span>${category}</span><span class="category-icon">+</span>`;
+
+                        const birdListDiv = document.createElement('div');
+                        birdListDiv.classList.add('bird-list', 'hidden', 'pl-4', 'pt-2');
+
+                        birdsByCategory[category].forEach(bird => {
+                            const birdButton = document.createElement('button');
+                            birdButton.classList.add('bird-button', 'block', 'w-full', 'px-4', 'py-2', 'mb-1', 'bg-gray-700/40', 'text-white', 'rounded-lg', 'text-left', 'hover:bg-gray-600/40', 'transition', 'duration-200', 'ease-in-out');
+                            birdButton.textContent = bird;
+                            birdListDiv.appendChild(birdButton);
+                        });
+
+                        categoryDiv.appendChild(categoryButton);
+                        categoryDiv.appendChild(birdListDiv);
+                        birdListContainer.appendChild(categoryDiv);
+
+                        categoryButton.addEventListener('click', () => {
+                            birdListDiv.classList.toggle('hidden');
+                            const icon = categoryButton.querySelector('.category-icon');
+                            icon.textContent = birdListDiv.classList.contains('hidden') ? '+' : '-';
+                        });
+                    }
+                }
+            };
+
+            // Event listeners
+            sendBtn.addEventListener('click', sendMessage);
+
+            userInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            birdListContainer.addEventListener('click', (event) => {
+                if (event.target.tagName === 'BUTTON' && event.target.classList.contains('bird-button')) {
+                    userInput.value = event.target.textContent.trim();
+                    sendMessage();
+                }
+            });
+
+            // Combined example queries listener
+            document.querySelectorAll('#example-queries button').forEach(button => {
+                button.addEventListener('click', () => {
+                    userInput.value = button.textContent.trim();
+                    sendMessage();
+                });
+            });
+
+            resetButton.addEventListener('click', resetMemory);
+            
+            // Initial rendering of the bird list
+            renderBirdList();
+        });
+    </script>
 </body>
 </html>

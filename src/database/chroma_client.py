@@ -62,7 +62,7 @@ class ChromaClient:
             logger.error(f"Failed to add data to {collection_name}: {e}")
             raise
 
-    def search(self, collection_name: str, query: str, n_results: int = 5):
+    def search(self, collection_name: str, query: str, n_results: int = 2):
         """Search in specified collection"""
         try:
             collection = self.get_or_create_collection(collection_name)

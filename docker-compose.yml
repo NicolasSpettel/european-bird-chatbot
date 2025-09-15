@@ -1,10 +1,5 @@
-# Use version 3 of the Docker Compose file format
-version: '3.8'
-
-# Define the services (your containers)
 services:
-  # The name of your service, changed from 'my-app' to 'bird-qa-agent'
-  bird-qa-agent:
+   bird-qa-agent:
     # Use the `build` instruction to build an image from your Dockerfile
     build: .
     

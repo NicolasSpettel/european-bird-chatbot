@@ -3,11 +3,9 @@ import logging
 import time
 from pathlib import Path
 
-# Assuming these are correctly imported or defined in your project
 from src.data.collectors.bird_collector import ComprehensiveBirdCollector
-from src.data.collectors.youtube_collector import YouTubeTranscriptCollector # assuming the YouTube class is in this path
+from src.data.collectors.youtube_collector import YouTubeTranscriptCollector
 
-# Set up logging for better visibility
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 

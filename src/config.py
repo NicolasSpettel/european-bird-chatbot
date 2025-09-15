@@ -8,6 +8,8 @@ class Config:
     # API Keys
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
+    LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
+    LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT")
     EBIRD_API_KEY = os.getenv("EBIRD_API_KEY")
     
     # Database
