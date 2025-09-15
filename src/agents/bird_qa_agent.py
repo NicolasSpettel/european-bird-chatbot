@@ -43,8 +43,9 @@ class BirdQueryTool(BaseTool):
                 n_results=3
             )
             
-            if not results or not results["documents"] or not results["documents"][0]:
-                return json.dumps([{"species": "Unknown", "description": f"No information found for '{query}'.", "image_url": "", "audio_url": ""}])
+            # **MODIFIED:** Handle cases where no results are found.
+            if not results or not results.get("documents") or not results["documents"][0]:
+                return json.dumps([{"species": "No Match Found", "description": f"No detailed information found for a query about '{query}'.", "image_url": "", "audio_url": ""}])
 
             output_results = []
             for i in range(len(results["documents"][0])):
@@ -72,9 +73,10 @@ class BirdQueryTool(BaseTool):
 
         except Exception as e:
             logger.error(f"Bird query failed: {e}")
+            # **MODIFIED:** Return a specific error object that the LLM can interpret.
             return json.dumps([{
                 "species": "Error",
-                "description": f"Error searching for '{query}'.",
+                "description": f"An error occurred while searching for '{query}'.",
                 "image_url": "",
                 "audio_url": "",
             }])
@@ -84,9 +86,12 @@ class YouTubeQueryTool(BaseTool):
     """Tool for querying YouTube for birdwatching advice."""
     name: str = "youtube_query"
     description: str = (
-        "Search YouTube for educational content on birdwatching advice and techniques. "
-        "Input: User query (string). Output: Plain text summary."
-    )
+    "This tool is for finding general advice and tips related to birdwatching, such as "
+    "how to start birdwatching, recommended gear, or where to find birds. "
+    "Use this for questions like 'How can I get into birding?', 'What equipment do I need?', or 'How can I get my friend interested in birding?' "
+    "Input: a concise query (e.g., 'birding tips for beginners', 'how to get a friend into birding'). "
+    "Output: A summary of relevant expert advice."
+)
     chroma_client: ChromaClient
 
     def _run(self, query: str) -> str:
@@ -128,6 +133,23 @@ class BirdQAAgent:
             BirdQueryTool(chroma_client=self.chroma_client),
             YouTubeQueryTool(chroma_client=self.chroma_client)
         ]
+
+        # New: Define the conversational prompt
+        agent_system_prompt = agent_system_prompt = agent_system_prompt = agent_system_prompt = """
+            You are a helpful and friendly AI assistant who is an expert on all things birds. You are a conversational and engaging parrot.
+
+            You have access to the following tools: {tools}
+
+            **Your only purpose is to answer questions about birds.**
+
+            **Instructions:**
+            - **Only use your tools when the user's query is directly about birds or bird-related topics.**
+            - For any other conversation, including greetings, small talk, or off-topic questions, respond directly and conversationally without using any tools.
+            - When using the `bird_query` tool, carefully analyze the results. If a bird is found, provide a friendly and concise answer using the provided information. If multiple birds are found, you may mention the most relevant one and suggest the user can ask for more details on the others.
+            - If a tool search for a bird yields "No Match Found," inform the user and ask if they would like to know about a different bird or a more general topic.
+            - Always provide your final answer in a friendly, conversational tone. Do not mention any tools or databases in your final response.
+            """.format(tools=[tool.name + ": " + tool.description for tool in self.tools])
+
         self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         self.agent_executor = initialize_agent(
             tools=self.tools,
@@ -135,8 +157,10 @@ class BirdQAAgent:
             agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
             verbose=True,
             memory=self.memory,
-            return_intermediate_steps=True
+            return_intermediate_steps=True,
+            agent_kwargs={"system_message": agent_system_prompt}
         )
+        
         self.last_image_url = ""
         self.last_audio_url = ""
 
@@ -168,93 +192,43 @@ class BirdQAAgent:
         return "YES" in validation_result.upper()
 
     def ask(self, user_query: str) -> Dict[str, Any]:
-        """Answer a user's question about birds."""
         try:
+            # Let the agent's internal logic handle everything
             response = self.agent_executor.invoke({"input": user_query})
-            raw_output = response["output"]
-            intermediate_steps = response["intermediate_steps"]
+            final_answer = response.get("output", "I'm sorry, I couldn't find an answer.")
+            # Extract data from intermediate steps if a tool was used
+            image_url = ""
+            audio_url = ""
+            species = ""
+            intermediate_steps = response.get("intermediate_steps", [])
 
-            bird_data = {}
             for action, observation in intermediate_steps:
                 if action.tool == "bird_query":
                     try:
-                        # The tool now returns a list, so load it as such
-                        data_list = json.loads(observation)
-                        if data_list:
-                            bird_data = data_list[0]  # Get the top result for display
-                            break
+                        bird_data_list = json.loads(observation)
+                        if bird_data_list and bird_data_list[0].get("species") != "No Match Found":
+                            selected_bird = bird_data_list[0]
+                            image_url = selected_bird.get("image_url", "")
+                            audio_url = selected_bird.get("audio_url", "")
+                            species = selected_bird.get("species", "")
                     except json.JSONDecodeError:
-                        logger.warning(f"Failed to parse bird data: {observation}")
-
-            species = bird_data.get("species", "")
-            image_url = bird_data.get("image_url", "")
-            audio_url = bird_data.get("audio_url", "")
-            description = bird_data.get("description", "")
+                        logger.warning("Failed to parse bird data.")
             
-            # New: Handle descriptive searches by formatting the LLM's raw output
-            if not species and "No information found" not in description:
-                # This path is for when the LLM uses the tool for a descriptive query
-                # but the raw output from the tool is complex.
-                # We'll re-prompt the LLM to format the response.
-                summary_prompt = PromptTemplate(
-                    input_variables=["user_query", "raw_output"],
-                    template=(
-                        "The user asked: '{user_query}'. "
-                        "The following information was found: {raw_output}. "
-                        "Synthesize this information into a clear and helpful response. "
-                        "Do not mention any tools or databases. "
-                        "If multiple birds are returned, mention a few of the top matches and describe them briefly. "
-                        "Prioritize the most relevant bird for the user's query."
-                    )
-                )
-                summary_chain = LLMChain(llm=self.llm, prompt=summary_prompt)
-                answer_text = summary_chain.run(user_query=user_query, raw_output=raw_output)
-            elif species:
-                # This path is for specific bird queries that get a clear result.
-                # It includes the validation logic.
-                is_match = self._validate_species_match(user_query, species)
-                if not is_match:
-                    return {
-                        "answer": f"I couldn't find information about '{user_query}'. The database returned '{species}', which doesn't seem to be a direct match. Did you mean another bird?",
-                        "species": "",
-                        "image_url": self.last_image_url,
-                        "audio_url": self.last_audio_url,
-                        "error": False,
-                    }
-                answer_prompt = PromptTemplate(
-                    input_variables=["user_query", "species", "description"],
-                    template=(
-                        "You are a birdwatching expert. The user asked: '{user_query}'. "
-                        "Here's what you know about the {species}: {description}. "
-                        "Provide a friendly, natural, and expert answer. Do not mention tools or databases." \
-                        "Keep the answer concise and engaging."
-                    )
-                )
-                answer_chain = LLMChain(llm=self.llm, prompt=answer_prompt)
-                answer_text = answer_chain.run(user_query=user_query, species=species, description=description)
-                
-                # Update last valid image and audio URLs if new data is available
-                if image_url: self.last_image_url = image_url
-                if audio_url: self.last_audio_url = audio_url
-            else:
-                # Generic fallback for no results
-                answer_text = "I couldn't find relevant information. Could you rephrase or ask about a specific bird?"
-                
+            # Return a single, unified output
             return {
-                "answer": strip_markdown_links(answer_text).strip(),
+                "answer": strip_markdown_links(final_answer),
                 "species": species,
-                "image_url": self.last_image_url,
-                "audio_url": self.last_audio_url,
+                "image_url": image_url,
+                "audio_url": audio_url,
                 "error": False,
             }
-
         except Exception as e:
             logger.error(f"Agent error: {e}")
             return {
                 "answer": "I encountered an error. Please try again.",
                 "species": "",
-                "image_url": self.last_image_url,
-                "audio_url": self.last_audio_url,
+                "image_url": "",
+                "audio_url": "",
                 "error": True,
             }
 

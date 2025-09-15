@@ -103,34 +103,23 @@ def health():
 def ask():
     print("=== NEW REQUEST ===")
     
-    # Check if agent is initialized
     if bird_agent is None:
-        return jsonify({
-            'response': 'Sorry, the system is not properly initialized. Please check the server logs.',
-            'image_url': '',
-            'audio_url': '',
-            'error': True
-        }), 500
+        return jsonify({'error': 'System not properly initialized'}), 500
     
     try:
         data = request.get_json()
         if not data or 'message' not in data:
-            return jsonify({
-                'response': 'No message provided',
-                'image_url': '',
-                'audio_url': '',
-                'error': True
-            }), 400
+            return jsonify({'error': 'No message provided'}), 400
             
         user_input = data['message']
         logger.info(f"Received text query: {user_input}")
 
-        # The agent is now responsible for returning a consistent dictionary.
         response_data = bird_agent.ask(user_input)
+        
         logger.info(f"Agent response: {response_data}")
 
         return jsonify({
-            'response': response_data.get('answer', response_data.get('description', '')),
+            'response': response_data.get('answer'),
             'image_url': response_data.get('image_url', ''),
             'audio_url': response_data.get('audio_url', ''),
             'species': response_data.get('species', ''),
@@ -140,7 +129,7 @@ def ask():
     except Exception as e:
         logger.error(f"Error processing request: {e}")
         return jsonify({
-            'answer': 'An internal server error occurred.',
+            'response': 'An internal server error occurred.',
             'image_url': '',
             'audio_url': '',
             'error': True
@@ -170,17 +159,20 @@ def ask_audio():
         transcription = response.get('transcription', '')
         logger.info(f"Transcription: {transcription}")
 
-        # Pass the transcription to the agent for a response
-        text_response = bird_agent.ask(transcription)
-        logger.info(f"Agent response to transcription: {text_response}")
+        # Pass the transcription to the agent for a single, correct response
+        response_data = bird_agent.ask(transcription)
+        logger.info(f"Agent response to transcription: {response_data}")
 
+        # Handle different agent outputs correctly
+        final_answer = response_data.get('answer') or response_data.get('output', '')
+        
         return jsonify({
-            'response': text_response.get('answer', ''),
-            'image_url': text_response.get('image_url', ''),
-            'audio_url': text_response.get('audio_url', ''),
-            'species': text_response.get('species', ''),
+            'response': final_answer,
+            'image_url': response_data.get('image_url', ''),
+            'audio_url': response_data.get('audio_url', ''),
+            'species': response_data.get('species', ''),
             'transcription': transcription,
-            'error': False
+            'error': response_data.get('error', False)
         })
 
     except Exception as e:
