@@ -11,6 +11,8 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            display: flex;
+            min-height: 100vh;
         }
         .background-image {
             background-image: url('https://image.jimcdn.com/app/cms/image/transf/none/path/sa6549607c78f5c11/image/i085c7d187a56151e/version/1482853751/madeira-hummingbird-best-bird-watching-destinations-in-europe-copyright-lukasz-janyst-european-best-destinations-european-best-destinations.jpg');
@@ -25,12 +27,13 @@
             z-index: -1;
         }
         .chat-container {
-            max-width: 1200px;
+            flex-grow: 1;
             height: 85vh;
             border-radius: 1rem;
             backdrop-filter: blur(5px);
             background-color: rgba(31, 41, 55, 0.6);
-            margin: auto; 
+            margin: auto;
+            margin-left: 20px;
             display: flex;
             flex-direction: row;
             gap: 6px;
@@ -40,7 +43,6 @@
         .message-input-container {
             backdrop-filter: blur(8px);
         }
-        
         .chat-messages::-webkit-scrollbar {
             width: 8px;
         }
@@ -49,11 +51,8 @@
             border-radius: 10px;
         }
         #bird-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
             width: 280px;
+            height: 100vh;
             background-color: rgba(31, 41, 55, 0.7);
             padding: 20px;
             overflow-y: auto;
@@ -62,6 +61,7 @@
             box-shadow: 2px 0 10px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
+            flex-shrink: 0;
         }
         #bird-sidebar h2 {
             margin-bottom: 1rem;
@@ -73,42 +73,42 @@
             overflow-y: auto;
             padding-right: 10px;
         }
-
-        .body-content-wrapper {
-            margin-left: 280px;
-            flex-grow: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
         #project-info-box {
             position: absolute;
-            bottom: 20px;
+            top: 20px;
             right: 20px;
             width: 250px;
-            height: 200px;
             background-color: rgba(75, 85, 99, 0.7);
             border-radius: 1rem;
             padding: 1rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             color: white;
             z-index: 5;
-            overflow-y: auto;
+            cursor: pointer;
+            overflow: hidden;
+            transition: height 0.3s ease-in-out;
+            height: 50px;
+        }
+        #project-info-box.expanded {
+            height: auto;
         }
         #project-info-box h2 {
             text-align: center;
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem;
             font-size: 1.25rem;
             font-weight: 700;
+        }
+        #project-info-box-content {
+            display: none;
+            margin-top: 0.5rem;
+        }
+        #project-info-box.expanded #project-info-box-content {
+            display: block;
         }
         #project-info-box p {
             font-size: 0.875rem;
             line-height: 1.5;
         }
-
         .main-chat-area {
             flex: 2;
             display: flex;
@@ -118,18 +118,18 @@
             border-radius: 1rem;
             padding: 1rem;
             box-shadow: none;
+            border-right: 1px dotted #ccc;
+            position: relative;
         }
-
         .image-audio-info-area {
             flex: 1;
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* <-- Now a flex column container */
             height: 100%;
             background-color: transparent;
             border-radius: 1rem;
             padding: 1rem;
             box-shadow: none;
-            position: relative;
             justify-content: flex-start;
         }
         .image-audio-info-area #image-container {
@@ -138,14 +138,17 @@
             min-height: 200px;
             margin-bottom: 1rem;
         }
+        #multi-bird-display {
+            flex-grow: 1; /* <-- Takes up all remaining space */
+            overflow-y: auto; /* <-- Becomes scrollable if needed */
+            padding-right: 10px;
+        }
         .image-audio-info-area #audio-player-container {
             flex-shrink: 0;
         }
-
         #chat-messages {
             flex-grow: 1;
         }
-
         .message-input-container {
             display: flex;
             align-items: center;
@@ -156,14 +159,13 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-
         #reset-memory-btn {
             position: absolute;
-            right: 20px;
-            bottom: 20px;
+            top: 10px;
+            left: 10px;
             z-index: 20;
-            width: 50px;
-            height: 50px;
+            width: 35px;
+            height: 35px;
             background-color: rgba(253, 224, 71, 0.8);
             color: white;
             border-radius: 50%;
@@ -181,18 +183,17 @@
         }
         #reset-status-message {
             position: absolute;
-            right: 80px;
-            bottom: 35px;
+            left: 80px;
+            top: 35px;
             z-index: 20;
             white-space: nowrap;
         }
-
         .transparent-bg {
             background-color: transparent;
         }
     </style>
 </head>
-<body class="flex min-h-screen">
+<body>
     <div class="background-image"></div>
     
     <div id="bird-sidebar">
@@ -200,61 +201,61 @@
         <div id="bird-list-container" class="bird-list-container text-white rounded-lg p-2 shadow-inner">
         </div>
     </div>
-
-    <div class="body-content-wrapper">
-        <div class="chat-container flex flex-col shadow-xl p-6 md:flex-row gap-6">
-
-            <div class="main-chat-area flex-[3] flex flex-col h-full rounded-xl p-4">
+    
+    <div class="chat-container flex flex-col shadow-xl p-6 md:flex-row gap-6">
+        <div class="main-chat-area flex-[3] flex flex-col h-full rounded-xl p-4">
+            <div class="relative">
+                <button id="reset-memory-btn" title="Reset my memory if I talk nonsense">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m15.356 2H21v-2m-2.144 6A8.001 8.001 0 0119.418 15" />
+                    </svg>
+                </button>
                 <h1 class="text-3xl font-extrabold text-white mb-4 text-center">Apollo, Bird Expert</h1>
-
-                <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 p-2 mb-4 chat-messages">
-                    <div class="flex justify-start">
-                        <div class="bg-gray-200/80 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words">
-                            <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-8 h-8 rounded-full">
-                            <span>Hello! I'm Apollo, your birdwatching expert in Europe. Ask me about a specific bird, or for general birdwatching tips.</span>
-                            <button class="tts-btn ml-2" title="Listen">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="example-queries" class="flex flex-wrap justify-center gap-2 mb-4">
-                    <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">What does a European Robin look like?</button>
-                    <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">How can I attract birds to my garden?</button>
-                </div>
-
-                <div class="message-input-container flex items-center p-2 rounded-full shadow-lg">
-                    <button id="mic-btn" class="flex items-center justify-center bg-red-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-red-600/80 focus:outline-none focus:ring-2 focus:ring-red-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3zM19 10v1a7 7 0 01-14 0v-1M12 18.5a.5.5 0 00-.5-.5h-1a.5.5 0 00-.5.5V21h4v-2.5a.5.5 0 00-.5-.5h-1a.5.5 0 00-.5.5z"/>
-                        </svg>
-                    </button>
-                    <input type="text" id="user-input" placeholder="Ask a question about birds..." class="flex-1 p-3 bg-transparent outline-none rounded-full text-white placeholder-gray-300">
-                    <button id="send-btn" class="flex items-center justify-center bg-blue-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-blue-600/80 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                        </svg>
-                    </button>
-                </div>
-                <div id="reset-status-message" class="mt-4 text-center text-sm font-medium"></div>
             </div>
-            
-            <div class="image-audio-info-area flex-1 flex flex-col h-full rounded-xl p-4 gap-4">
-                <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-inner">
-                    <h3 class="text-xl font-bold text-white mb-4">Bird Images</h2>
-                    <div id="multi-bird-display" class="flex flex-col gap-6 mt-6">
+            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 p-2 mb-4 chat-messages">
+                <div class="flex justify-start">
+                    <div class="bg-gray-200/80 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words">
+                        <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-8 h-8 rounded-full">
+                        <span>Hello! I'm Apollo, your birdwatching expert in Europe. Ask me about a specific bird, or for general birdwatching tips.</span>
+                        <button class="tts-btn ml-2" title="Listen">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
                     </div>
+                </div>
+            </div>
+            <div id="example-queries" class="flex flex-wrap justify-center gap-2 mb-4">
+                <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">What does a European Robin look like?</button>
+                <button class="px-4 py-2 bg-gray-600/70 text-white rounded-full text-sm hover:bg-gray-500/70 transition duration-200 ease-in-out">How can I attract birds to my garden?</button>
+            </div>
+            <div class="message-input-container flex items-center p-2 rounded-full shadow-lg">
+                <button id="mic-btn" class="flex items-center justify-center bg-red-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-red-600/80 focus:outline-none focus:ring-2 focus:ring-red-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3zM19 10v1a7 7 0 01-14 0v-1M12 18.5a.5.5 0 00-.5-.5h-1a.5.5 0 00-.5.5V21h4v-2.5a.5.5 0 00-.5-.5h-1a.5.5 0 00-.5.5z"/>
+                    </svg>
+                </button>
+                <input type="text" id="user-input" placeholder="Ask a question about birds..." class="flex-1 p-3 bg-transparent outline-none rounded-full text-white placeholder-gray-300">
+                <button id="send-btn" class="flex items-center justify-center bg-blue-500/80 text-white w-12 h-12 rounded-full transition duration-200 ease-in-out hover:bg-blue-600/80 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="reset-status-message" class="mt-4 text-center text-sm font-medium"></div>
+        </div>
+        <div class="image-audio-info-area flex-1 flex flex-col h-full rounded-xl p-4 gap-4">
+            <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-inner flex flex-col h-full">
+                <h3 class="text-xl font-bold text-white mb-4">Bird Images</h2>
+                <div id="multi-bird-display" class="flex-grow overflow-y-auto flex flex-col gap-6 mt-6">
                 </div>
             </div>
         </div>
     </div>
     
-    <div id="project-info-box">
+    <div id="project-info-box" onclick="toggleProjectInfo()">
         <h2 class="text-xl font-bold mb-4">Project Information</h2>
-        <div class="space-y-2 text-center text-sm">
+        <div id="project-info-box-content" class="space-y-2 text-center text-sm">
             <p>This is a demonstration of a large language model acting as a domain-specific expert.</p>
             <p>The backend is a Python server wrapped in a Docker container.</p>
             <p>
@@ -265,13 +266,20 @@
         </div>
     </div>
 
-    <button id="reset-memory-btn" title="Reset my memory if I talk nonsense">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m15.356 2H21v-2m-2.144 6A8.001 8.001 0 0119.418 15" />
-        </svg>
-    </button>
-
     <script>
+        function toggleProjectInfo() {
+            const projectInfoBox = document.getElementById('project-info-box');
+            const projectInfoContent = document.getElementById('project-info-box-content');
+            
+            if (projectInfoBox.classList.contains('expanded')) {
+                projectInfoBox.classList.remove('expanded');
+                projectInfoContent.style.display = 'none';
+            } else {
+                projectInfoBox.classList.add('expanded');
+                projectInfoContent.style.display = 'block';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const chatMessages = document.getElementById('chat-messages');
             const userInput = document.getElementById('user-input');
@@ -537,7 +545,7 @@
 
             // --- Bird List and Examples ---
             const birdsByCategory = {
-                "Waterfowl": ["Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter"],
+                "Waterfowl": ["Mute Swan", "Whooper Swan", "Tundra Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter"],
                 "Pheasants, Partridges, and Quails": ["Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail"],
                 "Grebes": ["Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe"],
                 "Pigeons and Doves": ["Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove"],
@@ -571,7 +579,8 @@
                 "Thrushes": ["Ring Ouzel", "Blackbird", "Fieldfare", "Song Thrush", "Redwing", "Mistle Thrush"],
                 "Warblers": ["Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler", "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler", "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat", "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler"],
                 "Flycatchers": ["Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher"],
-                "Tits": ["Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit", "Long-tailed Tit"],
+                "Tits": ["Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit"],
+                "Long-tailed Tits and Allies": ["Long-tailed Tit"],
                 "Nuthatches": ["Eurasian Nuthatch"],
                 "Treecreepers": ["Eurasian Treecreeper", "Short-toed Treecreeper"],
                 "Shrikes": ["Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike"],

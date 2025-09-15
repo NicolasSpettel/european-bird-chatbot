@@ -14,7 +14,9 @@ from src.database.chroma_client import ChromaClient
 from src.config import Config
 import os
 from openai import OpenAI
+from dotenv import load_dotenv
 
+load_dotenv() 
 logger = logging.getLogger(__name__)
 
 def strip_markdown_links(text):
@@ -51,7 +53,6 @@ class BirdQueryTool(BaseTool):
                 doc = results["documents"][0][i]
                 metadata = results["metadatas"][0][i]
                 
-                # Use a more robust check for `None` values
                 species = metadata.get("species", "Unknown")
                 image_url = metadata.get("thumbnail", "")
                 audio_url = metadata.get("audio_url", "")
