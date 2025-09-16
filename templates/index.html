@@ -418,6 +418,55 @@
                     const messageText = data.response;
                     addMessage(messageText, 'bot');
                     
+                    multiBirdDisplay.innerHTML = '';
+                    if (data.birds && data.birds.length > 0) {
+                        data.birds.slice(0, 2).forEach(bird => {
+                            const birdCard = document.createElement('div');
+                            birdCard.classList.add(
+                                'bg-gray-700/60',
+                                'p-4',
+                                'rounded-xl',
+                                'shadow-lg',
+                                'text-white',
+                                'flex',
+                                'flex-col',
+                                'items-center',
+                                'space-y-4'
+                            );
+
+                            const speciesNameEl = document.createElement('h3');
+                            speciesNameEl.classList.add('text-lg', 'font-bold');
+                            speciesNameEl.textContent = bird.species;
+                            birdCard.appendChild(speciesNameEl);
+
+                            if (bird.image_url) {
+                                const imgElement = document.createElement('img');
+                                imgElement.src = bird.image_url;
+                                imgElement.alt = `Image of a ${bird.species}`;
+                                imgElement.classList.add('w-full', 'h-auto', 'object-cover', 'rounded-xl', 'shadow');
+                                birdCard.appendChild(imgElement);
+                            }
+
+                            if (bird.audio_url) {
+                                const audioEl = document.createElement('audio');
+                                audioEl.classList.add('w-full');
+                                audioEl.setAttribute('controls', '');
+                                const audioSource = document.createElement('source');
+                                audioSource.src = `/stream_audio?url=${encodeURIComponent(bird.audio_url)}`;
+                                audioSource.type = 'audio/mpeg';
+                                audioEl.appendChild(audioSource);
+                                birdCard.appendChild(audioEl);
+                            }
+
+                            multiBirdDisplay.appendChild(birdCard);
+                        });
+                    } else {
+                        multiBirdDisplay.innerHTML = `<p class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
+                            No bird data found for this query.
+                        </p>`;
+                    }
+                    // --- END of ADDED LOGIC ---
+
                 } catch (error) {
                     console.error('Error fetching bot response with audio:', error);
                     hideLoading();

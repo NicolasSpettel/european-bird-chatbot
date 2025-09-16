@@ -8,16 +8,13 @@ from dotenv import load_dotenv
 from src.agents.bird_qa_agent import BirdQAAgent
 import os
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
 
-# Fix CORS - allow all origins for development
 CORS(app, resources={
     r"/*": {
         "origins": "*",
@@ -94,10 +91,7 @@ def home():
 
 @app.route('/health')
 def health():
-    return jsonify({
-        "status": "healthy",
-        "agent_initialized": bird_agent is not None
-    })
+    return "OK", 200
 
 @app.route('/ask', methods=['POST'])
 def ask():
@@ -166,15 +160,9 @@ def ask_audio():
         logger.error(f"Error processing audio upload: {e}")
         return jsonify({'error': 'An internal error occurred'}), 500
 
-
-# Add error handlers
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Endpoint not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

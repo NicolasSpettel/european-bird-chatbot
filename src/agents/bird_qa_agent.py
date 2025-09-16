@@ -101,7 +101,6 @@ class YouTubeQueryTool(BaseTool):
             if not results or not results["documents"] or not results["documents"][0]:
                 return "No expert advice found on this topic."
 
-            # Summarize the top 3 transcripts for the LLM
             summaries = []
             for i in range(len(results["documents"][0])):
                 doc = results["documents"][0][i]
