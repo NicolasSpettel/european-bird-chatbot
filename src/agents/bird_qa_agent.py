@@ -3,7 +3,7 @@
 import json
 import logging
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from langchain.agents import initialize_agent, AgentType
 from langchain.tools import BaseTool
 from langchain_openai import ChatOpenAI
@@ -25,11 +25,9 @@ class BirdQueryTool(BaseTool):
     """Tool for querying bird species information with internal metadata separation."""
     name: str = "bird_query"
     description: str = (
-        "Search for comprehensive information about a specific bird species or a description of a bird. The database also includes audio and images."
-        "This tool handles audio and image URLs internally and does not expose them to the assistant. Always expect images to be displayed automatically"
+        "Search for comprehensive information about a specific bird species or a description of a bird. "
         "Input: The bird species name (e.g., 'european robin') OR a descriptive phrase (e.g., 'a small bird with a red chest'). "
         "Output: Clean species information for conversation."
-
     )
     chroma_client: ChromaClient
     _stored_metadata: List[Dict[str, str]] = []
@@ -68,7 +66,6 @@ class BirdQueryTool(BaseTool):
                     logger.warning(f"Found 'Unknown' species for query '{cleaned_query}'. Treating as no match.")
                     continue
                 
-                # Store metadata separately (LLM never sees this)
                 bird_metadata = {
                     "species": species,
                     "image_url": metadata.get("thumbnail", ""),
@@ -77,7 +74,6 @@ class BirdQueryTool(BaseTool):
                 }
                 self._stored_metadata.append(bird_metadata)
                 
-                # Extract clean description for LLM
                 description_part = doc.split("DETAILED_INFO:")[1].strip() if "DETAILED_INFO:" in doc else doc
                 clean_description = strip_markdown_links(description_part)[:1000].strip()
                 
@@ -89,22 +85,22 @@ class BirdQueryTool(BaseTool):
             if not clean_descriptions:
                 return f"No detailed information found for '{cleaned_query}'."
             
-            # Return ONLY clean text to LLM (no URLs, no metadata)
+            # ✨ New logic to return a more definitive, non-negotiable tool output
+            bird = clean_descriptions[0]
             if len(clean_descriptions) == 1:
-                bird = clean_descriptions[0]
-                return f"Found {bird['species']}: {bird['description']}"
+                return f"The database search found information for the following bird: {bird['species']}. Description: {bird['description']}"
             else:
-                # Multiple results
-                result_text = f"Found {len(clean_descriptions)} birds:\n"
-                for bird in clean_descriptions:
-                    result_text += f"- {bird['species']}: {bird['description'][:200]}...\n"
+                 # If multiple results, provide a clear ranking or summary
+                result_text = f"The database search found a few birds that match. The top result is {bird['species']}. Description: {bird['description'][:200]}... Other birds found are:\n"
+                for other_bird in clean_descriptions[1:]:
+                     result_text += f"- {other_bird['species']}: {other_bird['description'][:100]}...\n"
                 return result_text
-
+        
         except Exception as e:
             logger.error(f"Bird query failed: {e}")
             self._stored_metadata = []
             return f"An error occurred while searching for '{cleaned_query}'."
-    
+        
     def get_stored_metadata(self) -> List[Dict[str, str]]:
         """Get metadata without exposing it to LLM."""
         return self._stored_metadata.copy()
@@ -160,36 +156,41 @@ class BirdQAAgent:
             openai_api_key=Config.OPENAI_API_KEY
         )
         
-        # Initialize tools with references we can access later
         self.bird_tool = BirdQueryTool(chroma_client=self.chroma_client)
         self.youtube_tool = YouTubeQueryTool(chroma_client=self.chroma_client)
         self.tools = [self.bird_tool, self.youtube_tool]
 
         agent_system_prompt = """
-You are a helpful and friendly AI assistant who is an expert on all things birds. You are a conversational and engaging parrot.
+You are an expert AI assistant (embodied as a smart parrot) specializing in all things related to European birds. Your knowledge and purpose are strictly limited to providing information on this topic.
 
-You have access to the following tools: {tools}
+Primary Directives:
 
-**Your only purpose is to answer questions about birds.**
+For ANY bird-related query, regardless of how general it is, you MUST first use your bird_query tool to search for information. This is the foundational step for every response.
 
-**Instructions:**
-- **Use your tools when the user's query is directly about a bird species or bird-related topics.**
-- For any other conversation, including greetings, small talk, or off-topic questions, respond directly and conversationally without using any tools, but try to get back on the topic of birds.
-- When using the bird_query tool, use the information it provides to give a friendly, knowledgeable response about the bird.
-- If the tool indicates no information was found, you can offer general knowledge but state it's from your general knowledge.
-- For birdwatching advice, use the youtube_query tool.
-- Always provide your final answer in a friendly, conversational tone. Do not mention tools or databases unless a search explicitly failed.
-- Focus on being helpful and engaging while sharing bird knowledge.
-        """.format(tools=[f"{tool.name}: {tool.description}" for tool in self.tools])
+Analyze the search results from the bird_query tool.
+
+If the tool provides information about a specific bird, construct a comprehensive and helpful response based on those results.
+
+If the results are not a perfect match or don't provide a complete answer (e.g., a general question like "do birds get hungry?"), still acknowledge the search. You should then use your broader knowledge to provide a general answer to the user's question, mentioning that the tool found related but not directly relevant information. The goal is to always use the tool and then reason about its output.
+
+If the query is NOT about birds or any bird-related topic (e.g., "What is the weather?"), you must politely decline to answer. Your response must be: "I'm sorry, but my knowledge is focused on European birds. Please ask me a question about birds!" This is your final, mandatory fallback for truly out-of-scope queries.
+"""
 
         self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         self.agent_executor = initialize_agent(
             tools=self.tools,
             llm=self.llm,
-            agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+            # Change AgentType to use OpenAI's native tool calling
+            agent=AgentType.OPENAI_FUNCTIONS,
             verbose=True,
             memory=self.memory,
-            return_intermediate_steps=False,  # We don't need these anymore
+            return_intermediate_steps=False,
+            # The tool-calling agent is more robust and less prone to parsing errors,
+            # so `handle_parsing_errors=True` is not strictly needed but can be kept
+            # for an extra layer of safety.
+            handle_parsing_errors=True,
+            # Remove `agent_kwargs` with `format_instructions`
+            # as the tool-calling agent doesn't need them.
             agent_kwargs={"system_message": agent_system_prompt}
         )
 
@@ -232,6 +233,7 @@ You have access to the following tools: {tools}
                 "response": "I encountered an error. Please try again.",
                 "birds": [],
                 "error": True,
+                "message": str(e)
             }
 
     def process_audio_bytes(self, audio_bytes: bytes, filename: str) -> Dict[str, Any]:
