@@ -7,17 +7,16 @@ import re
 
 logger = logging.getLogger(__name__)
 
-
 class YouTubeTranscriptCollector:
+    """Collects YouTube video transcripts and metadata for educational content."""
+    
     def __init__(self):
         self.headers = {
             "User-Agent": "BirdwatchingChatbot/1.0 Educational Project"
         }
-        # Create a reusable API client instance
-        self.ytt_api = YouTubeTranscriptApi()
 
     def extract_video_id(self, url: str) -> Optional[str]:
-        """Extract video ID from YouTube URL"""
+        """Extract video ID from YouTube URL."""
         patterns = [
             r"(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})",
             r"youtube\.com/embed/([a-zA-Z0-9_-]{11})",
@@ -32,7 +31,7 @@ class YouTubeTranscriptCollector:
         return None
 
     def get_video_info(self, video_id: str) -> Optional[Dict]:
-        """Get basic video info using oEmbed API"""
+        """Get basic video info using oEmbed API."""
         try:
             oembed_url = (
                 f"https://www.youtube.com/oembed?url="
@@ -46,29 +45,24 @@ class YouTubeTranscriptCollector:
             return None
 
     def get_transcript(self, video_id: str) -> Optional[str]:
-        """Get transcript for a YouTube video"""
+        """Get transcript for a YouTube video."""
         try:
-            # Fetch transcript in English (manual or auto-generated)
-            fetched_transcript = self.ytt_api.fetch(
-                video_id, languages=["en", "en-US"]
-            )
-            raw_transcript = fetched_transcript.to_raw_data()
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript = transcript_list.find_transcript(['en', 'en-US'])
+            raw_transcript = transcript.fetch()
 
-            # Join transcript lines into one string
-            transcript = " ".join(entry["text"] for entry in raw_transcript)
-            return transcript.strip()
+            transcript_text = " ".join(entry["text"] for entry in raw_transcript)
+            return transcript_text.strip()
 
         except NoTranscriptFound:
-            logger.warning(
-                f"No English transcript or captions found for video ID: {video_id}"
-            )
+            logger.warning(f"No English transcript found for video ID: {video_id}")
             return None
         except Exception as e:
             logger.error(f"Failed to get transcript for {video_id}: {e}")
             return None
 
     def collect_video_data(self, url: str, category: str = "birdwatching") -> Optional[Dict]:
-        """Collect complete video data including transcript"""
+        """Collect complete video data including transcript."""
         video_id = self.extract_video_id(url)
         if not video_id:
             return None

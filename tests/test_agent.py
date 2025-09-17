@@ -21,8 +21,7 @@ def test_bird_agent():
         
         # Test questions
         test_questions = [
-            "tell me about the mute swan",
-            "what bird has white feathers and orange beak?",
+            "common cuckoo"
         ]
         
         print("\nTesting agent with questions:")
@@ -35,9 +34,9 @@ def test_bird_agent():
             response = agent.ask(question)
             
             if response["error"]:
-                print(f"ERROR: {response['answer']}")
+                print(f"ERROR: {response['response']}")
             else:
-                print(f"Answer: {response['answer']}")
+                print(f"Answer: {response['response']}")
                 
         print("\n" + "=" * 50)
         print("Agent testing complete!")

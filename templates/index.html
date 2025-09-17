@@ -47,7 +47,7 @@
             width: 8px;
         }
         .chat-messages::-webkit-scrollbar-thumb {
-            background-color: #4b5563;
+            background-color: #d4af37;
             border-radius: 10px;
         }
         #bird-sidebar {
@@ -72,6 +72,10 @@
             flex-grow: 1;
             overflow-y: auto;
             padding-right: 10px;
+        }
+        #bird-list-container::-webkit-scrollbar-thumb {
+        background-color: #d4af37;
+        border-radius: 10px;
         }
         #project-info-box {
             position: absolute;
@@ -139,9 +143,13 @@
             margin-bottom: 1rem;
         }
         #multi-bird-display {
-            flex-grow: 1; /* <-- Takes up all remaining space */
-            overflow-y: auto; /* <-- Becomes scrollable if needed */
+            flex-grow: 1; 
+            overflow-y: auto; 
             padding-right: 10px;
+        }
+        #multi-bird-display::-webkit-scrollbar-thumb {
+        background-color: #d4af37; /* Apply to the multi-bird display */
+        border-radius: 10px;
         }
         .image-audio-info-area #audio-player-container {
             flex-shrink: 0;
@@ -215,7 +223,7 @@
             <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 p-2 mb-4 chat-messages">
                 <div class="flex justify-start">
                     <div class="bg-gray-200/80 text-gray-800 p-4 rounded-xl max-w-[80%] flex items-center space-x-2 bot-message break-words">
-                        <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-8 h-8 rounded-full">
+                        <img src="https://img.freepik.com/premium-photo/hyperrealistic-portraiture-parrot-with-glasses_899449-28389.jpg" alt="Bot Avatar" class="w-12 h-12 rounded-full mr-3">
                         <span>Hello! I'm Apollo, your birdwatching expert in Europe. Ask me about a specific bird, or for general birdwatching tips.</span>
                         <button class="tts-btn ml-2" title="Listen">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
@@ -246,7 +254,8 @@
         </div>
         <div class="image-audio-info-area flex-1 flex flex-col h-full rounded-xl p-4 gap-4">
             <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-inner flex flex-col h-full">
-                <h3 class="text-xl font-bold text-white mb-4">Bird Images</h2>
+                <h3 class="text-xl font-bold text-white mb-0 text-center">Images and Sounds in our Database</h3>
+                <span class="text-white text-center text-sm opacity-80 mt-1">Some Images or Sounds might be missing for certain birds</span>
                 <div id="multi-bird-display" class="flex-grow overflow-y-auto flex flex-col gap-6 mt-6">
                 </div>
             </div>
@@ -299,7 +308,6 @@
             let mediaRecorder = null;
             let audioChunks = [];
 
-            // Simple Markdown parser for links and images
             const parseMarkdown = (text) => {
                 text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
                     return `<a href="${url}" target="_blank" class="text-blue-300 hover:text-blue-200 underline">${linkText}</a>`;
@@ -465,7 +473,6 @@
                             No bird data found for this query.
                         </p>`;
                     }
-                    // --- END of ADDED LOGIC ---
 
                 } catch (error) {
                     console.error('Error fetching bot response with audio:', error);
@@ -477,6 +484,8 @@
             const sendMessage = async () => {
                 const message = userInput.value.trim();
                 if (!message) return;
+
+                const isFirstMessage = exampleQueries.style.display !== 'none';
 
                 addMessage(message, 'user');
                 userInput.value = '';
@@ -499,30 +508,19 @@
                     
                     multiBirdDisplay.innerHTML = '';
 
-
                     if (data.birds && data.birds.length > 0) {
-                        // Limit to the first 2 birds
                         data.birds.slice(0, 2).forEach(bird => {
                             const birdCard = document.createElement('div');
                             birdCard.classList.add(
-                                'bg-gray-700/60',
-                                'p-4',
-                                'rounded-xl',
-                                'shadow-lg',
-                                'text-white',
-                                'flex',
-                                'flex-col',
-                                'items-center',
-                                'space-y-4'
+                                'bg-gray-700/60', 'p-4', 'rounded-xl', 'shadow-lg',
+                                'text-white', 'flex', 'flex-col', 'items-center', 'space-y-4'
                             );
 
-                            // Create species name heading
                             const speciesNameEl = document.createElement('h3');
                             speciesNameEl.classList.add('text-lg', 'font-bold');
                             speciesNameEl.textContent = bird.species;
                             birdCard.appendChild(speciesNameEl);
 
-                            // Create image element
                             if (bird.image_url) {
                                 const imgElement = document.createElement('img');
                                 imgElement.src = bird.image_url;
@@ -531,7 +529,6 @@
                                 birdCard.appendChild(imgElement);
                             }
 
-                            // Create audio player
                             if (bird.audio_url) {
                                 const audioEl = document.createElement('audio');
                                 audioEl.classList.add('w-full');
@@ -546,12 +543,14 @@
                             multiBirdDisplay.appendChild(birdCard);
                         });
                     } else {
-                        // Display a message if no birds are found in the structured data
                         multiBirdDisplay.innerHTML = `<p class="p-4 text-white rounded-md bg-white/10 backdrop-blur-md">
                             No bird data found for this query.
                         </p>`;
                     }
-                    // --- END of MODIFIED LOGIC ---
+                    
+                    if (isFirstMessage) {
+                        exampleQueries.style.display = 'none';
+                    }
 
                 } catch (error) {
                     console.error('Error fetching bot response:', error);
@@ -559,6 +558,7 @@
                     addMessage("Sorry, I couldn't connect to the server. Please check the backend.", 'bot');
                 }
             };
+
 
             const resetMemory = async () => {
                 resetStatusMessage.className = 'mt-4 text-center text-sm font-medium text-gray-400';
@@ -585,16 +585,13 @@
                     resetStatusMessage.textContent = 'Failed to connect to the server. Please check your network connection.';
                 } finally {
                     resetButton.disabled = false;
-                    // Clear the message after 3 seconds
                     setTimeout(() => {
                         resetStatusMessage.textContent = '';
                     }, 3000);
                 }
             };
-
-            // --- Bird List and Examples ---
             const birdsByCategory = {
-                "Waterfowl": ["Mute Swan", "Whooper Swan", "Tundra Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter"],
+                "Waterfowl": ["Mute Swan", "Whooper Swan", "Bewick's Swan", "Greylag Goose", "Canada Goose", "Barnacle Goose", "Egyptian Goose", "Shelduck", "Mallard", "Gadwall", "Teal", "Shoveler", "Pochard", "Tufted Duck", "Scaup", "Eider", "Long-tailed Duck", "Smew", "Red-breasted Merganser", "Goosander", "Velvet Scoter"],
                 "Pheasants, Partridges, and Quails": ["Common Pheasant", "Grey Partridge", "Red-legged Partridge", "Common Quail"],
                 "Grebes": ["Little Grebe", "Great Crested Grebe", "Red-necked Grebe", "Slavonian Grebe", "Black-necked Grebe"],
                 "Pigeons and Doves": ["Rock Dove", "Stock Dove", "Wood Pigeon", "Collared Dove"],
@@ -606,7 +603,7 @@
                 "Bustards": ["Great Bustard", "Little Bustard"],
                 "Oystercatchers": ["Eurasian Oystercatcher"],
                 "Plovers": ["Northern Lapwing", "Little Ringed Plover", "Ringed Plover", "Kentish Plover", "Golden Plover", "Grey Plover", "Dotterel"],
-                "Sandpipers and Snipes": ["Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper", "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint", "Temminck's Stint", "Dunlin", "Ruff", "Avocet"],
+                "Sandpipers and Snipes": ["Common Snipe", "Jack Snipe", "Woodcock", "Black-tailed Godwit", "Bar-tailed Godwit", "Curlew", "Spotted Redshank", "Redshank", "Greenshank", "Green Sandpiper", "Wood Sandpiper", "Common Sandpiper", "Turnstone", "Knot", "Sanderling", "Little Stint", "Temminck's Stint", "Dunlin", "Avocet"],
                 "Skuas and Gulls": ["Great Skua", "Arctic Skua", "Pomarine Skua", "Long-tailed Skua", "Mediterranean Gull", "Black-headed Gull", "Little Gull", "Common Gull", "Lesser Black-backed Gull", "Herring Gull", "Yellow-legged Gull", "Great Black-backed Gull", "Kittiwake", "Sabine's Gull", "Ivory Gull", "Glaucous Gull"],
                 "Terns": ["Little Tern", "Sandwich Tern", "Common Tern", "Arctic Tern", "Roseate Tern", "Black Tern", "White-winged Black Tern"],
                 "Auks": ["Guillemot", "Razorbill", "Black Guillemot", "Little Auk", "Puffin"],
@@ -616,7 +613,7 @@
                 "Birds of Prey": ["Honey Buzzard", "Black Kite", "Red Kite", "White-tailed Eagle", "Golden Eagle", "Short-toed Eagle", "Marsh Harrier", "Hen Harrier", "Montagu's Harrier", "Goshawk", "Sparrowhawk", "Buzzard", "Rough-legged Buzzard", "Osprey", "Kestrel", "Red-footed Falcon", "Merlin", "Hobby", "Peregrine Falcon"],
                 "Owls": ["Barn Owl", "Scops Owl", "Eagle Owl", "Tawny Owl", "Long-eared Owl", "Short-eared Owl", "Little Owl", "Pygmy Owl"],
                 "Kingfishers": ["Common Kingfisher"],
-                "Woodpeckers": ["Wryneck", "Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker", "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker"],
+                "Woodpeckers": ["Green Woodpecker", "Great Spotted Woodpecker", "Middle Spotted Woodpecker", "Lesser Spotted Woodpecker", "Black Woodpecker", "Grey-headed Woodpecker"],
                 "Larks": ["Woodlark", "Skylark", "Crested Lark", "Shore Lark"],
                 "Swallows and Martins": ["Sand Martin", "Swallow", "House Martin", "Red-rumped Swallow"],
                 "Pipits and Wagtails": ["Tree Pipit", "Meadow Pipit", "Rock Pipit", "Water Pipit", "White Wagtail", "Grey Wagtail", "Yellow Wagtail"],
@@ -629,16 +626,16 @@
                 "Warblers": ["Cetti's Warbler", "Sedge Warbler", "Reed Warbler", "Marsh Warbler", "Icterine Warbler", "Willow Warbler", "Common Chiffchaff", "Wood Warbler", "Greenish Warbler", "Arctic Warbler", "Bonelli's Warbler", "Garden Warbler", "Blackcap", "Lesser Whitethroat", "Common Whitethroat", "Dartford Warbler", "Subalpine Warbler", "Sardinian Warbler", "Melodious Warbler"],
                 "Flycatchers": ["Spotted Flycatcher", "Pied Flycatcher", "Collared Flycatcher", "Red-breasted Flycatcher"],
                 "Tits": ["Coal Tit", "Marsh Tit", "Willow Tit", "Crested Tit", "Blue Tit", "Great Tit"],
-                "Long-tailed Tits and Allies": ["Long-tailed Tit"],
+                "Long-tailed Tits": ["Long-tailed Tit"],
                 "Nuthatches": ["Eurasian Nuthatch"],
                 "Treecreepers": ["Eurasian Treecreeper", "Short-toed Treecreeper"],
                 "Shrikes": ["Red-backed Shrike", "Lesser Grey Shrike", "Woodchat Shrike"],
                 "Crows and Allies": ["Eurasian Jay", "Magpie", "Spotted Nutcracker", "Chough", "Jackdaw", "Rook", "Carrion Crow", "Hooded Crow", "Raven"],
                 "Starlings": ["European Starling", "Rose-coloured Starling"],
                 "Sparrows": ["House Sparrow", "Tree Sparrow"],
-                "Finches": ["Chaffinch", "Brambling", "Hawfinch", "Greenfinch", "Siskin", "Linnet", "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill", "Parrot Crossbill", "Bullfinch"],
+                "Finches": ["Chaffinch", "Brambling", "Greenfinch", "Siskin", "Linnet", "Twite", "Common Redpoll", "Arctic Redpoll", "Two-barred Crossbill", "Common Crossbill", "Parrot Crossbill", "Bullfinch"],
                 "Buntings": ["Yellowhammer", "Cirl Bunting", "Rock Bunting", "Ortolan Bunting", "Reed Bunting", "Corn Bunting", "Lapland Bunting", "Snow Bunting"],
-                "Miscellaneous": ["Bearded Reedling", "Penduline Tit", "Golden Oriole", "Hoopoe"]
+                "Miscellaneous": ["Bearded Reedling"]
             };
             
             const renderBirdList = () => {
@@ -673,8 +670,6 @@
                     }
                 }
             };
-
-            // Event listeners
             sendBtn.addEventListener('click', sendMessage);
 
             userInput.addEventListener('keypress', (event) => {
@@ -690,7 +685,6 @@
                 }
             });
 
-            // Combined example queries listener
             document.querySelectorAll('#example-queries button').forEach(button => {
                 button.addEventListener('click', () => {
                     userInput.value = button.textContent.trim();
@@ -700,7 +694,6 @@
 
             resetButton.addEventListener('click', resetMemory);
             
-            // Initial rendering of the bird list
             renderBirdList();
         });
     </script>

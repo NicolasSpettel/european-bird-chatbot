@@ -3,13 +3,11 @@
 import json
 import logging
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from langchain.agents import initialize_agent, AgentType
 from langchain.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
 from src.database.chroma_client import ChromaClient
 from src.config import Config
 import os
@@ -24,69 +22,107 @@ def strip_markdown_links(text):
     return re.sub(r'!\[.*?\]\((.*?)\)', '', text)
 
 class BirdQueryTool(BaseTool):
-    """Tool for querying bird species information from the Chroma database. Handles both name and descriptive queries."""
+    """Tool for querying bird species information with internal metadata separation."""
     name: str = "bird_query"
     description: str = (
-        "Search for comprehensive information about a specific bird species or a description of a bird. "
+        "Search for comprehensive information about a specific bird species or a description of a bird. The database also includes audio and images."
+        "This tool handles audio and image URLs internally and does not expose them to the assistant. Always expect images to be displayed automatically"
         "Input: The bird species name (e.g., 'european robin') OR a descriptive phrase (e.g., 'a small bird with a red chest'). "
-        "Output: JSON list with keys: 'species', 'description', 'image_url', 'audio_url'."
+        "Output: Clean species information for conversation."
+
     )
     chroma_client: ChromaClient
-
+    _stored_metadata: List[Dict[str, str]] = []
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._stored_metadata = []
+    
     def _run(self, query: str) -> str:
-        """Execute the bird query and return structured results."""
+        """Execute bird query and separate metadata from conversational content."""
         try:
-            logger.info(f"Searching for bird with query: '{query}'")
+            cleaned_query = query.strip().strip('`').strip()
+            logger.info(f"Searching for bird with cleaned query: '{cleaned_query}'")
             
             results = self.chroma_client.search(
                 collection_name="birds",
-                query=query,
+                query=cleaned_query,
                 n_results=2
             )
             
-            # Simplified check for no results
+            self._stored_metadata = []
+            
             if not results.get("documents") or not results["documents"][0]:
-                return json.dumps([{"species": "No Match Found", "description": f"No detailed information found for '{query}'.", "image_url": "", "audio_url": ""}])
+                logger.info(f"No results found for query: '{cleaned_query}'")
+                return f"No detailed information found for '{cleaned_query}'."
 
-            output_results = []
+            clean_descriptions = []
+            
             for i in range(len(results["documents"][0])):
                 doc = results["documents"][0][i]
                 metadata = results["metadatas"][0][i]
                 
-                species = metadata.get("species", "Unknown")
-                image_url = metadata.get("thumbnail", "")
-                audio_url = metadata.get("audio_url", "")
+                species = metadata.get("title", "Unknown")
                 
-                # Utilize the strip_markdown_links utility function for consistency
-                description_part = doc.split("DETAILED_INFO:")[1].strip() if "DETAILED_INFO:" in doc else doc
-                description = strip_markdown_links(description_part)[:1000].strip()
+                if species == "Unknown":
+                    logger.warning(f"Found 'Unknown' species for query '{cleaned_query}'. Treating as no match.")
+                    continue
                 
-                result = {
+                # Store metadata separately (LLM never sees this)
+                bird_metadata = {
                     "species": species,
-                    "description": description,
-                    "image_url": image_url,
-                    "audio_url": audio_url,
+                    "image_url": metadata.get("thumbnail", ""),
+                    "audio_url": metadata.get("audio_url", ""),
+                    "page_url": metadata.get("url", "")
                 }
-                output_results.append(result)
+                self._stored_metadata.append(bird_metadata)
+                
+                # Extract clean description for LLM
+                description_part = doc.split("DETAILED_INFO:")[1].strip() if "DETAILED_INFO:" in doc else doc
+                clean_description = strip_markdown_links(description_part)[:1000].strip()
+                
+                clean_descriptions.append({
+                    "species": species,
+                    "description": clean_description
+                })
 
-            logger.info(f"Returning bird data: {output_results}")
-            return json.dumps(output_results)
+            if not clean_descriptions:
+                return f"No detailed information found for '{cleaned_query}'."
+            
+            # Return ONLY clean text to LLM (no URLs, no metadata)
+            if len(clean_descriptions) == 1:
+                bird = clean_descriptions[0]
+                return f"Found {bird['species']}: {bird['description']}"
+            else:
+                # Multiple results
+                result_text = f"Found {len(clean_descriptions)} birds:\n"
+                for bird in clean_descriptions:
+                    result_text += f"- {bird['species']}: {bird['description'][:200]}...\n"
+                return result_text
 
         except Exception as e:
             logger.error(f"Bird query failed: {e}")
-            return json.dumps([{"species": "Error", "description": f"An error occurred while searching for '{query}'.", "image_url": "", "audio_url": ""}])
-
+            self._stored_metadata = []
+            return f"An error occurred while searching for '{cleaned_query}'."
+    
+    def get_stored_metadata(self) -> List[Dict[str, str]]:
+        """Get metadata without exposing it to LLM."""
+        return self._stored_metadata.copy()
+    
+    def clear_stored_metadata(self):
+        """Clear stored metadata."""
+        self._stored_metadata = []
 
 class YouTubeQueryTool(BaseTool):
     """Tool for querying YouTube for birdwatching advice."""
     name: str = "youtube_query"
     description: str = (
-    "This tool is for finding general advice and tips related to birdwatching, such as "
-    "how to start birdwatching, recommended gear, or where to find birds. "
-    "Use this for questions like 'How can I get into birding?', 'What equipment do I need?', or 'How can I get my friend interested in birding?' "
-    "Input: a concise query (e.g., 'birding tips for beginners', 'how to get a friend into birding'). "
-    "Output: A summary of relevant expert advice."
-)
+        "Find general advice and tips related to birdwatching, such as "
+        "how to start birdwatching, recommended gear, or where to find birds. "
+        "Use this for questions like 'How can I get into birding?', 'What equipment do I need?' "
+        "Input: a concise query (e.g., 'birding tips for beginners'). "
+        "Output: A summary of relevant expert advice."
+    )
     chroma_client: ChromaClient
 
     def _run(self, query: str) -> str:
@@ -105,13 +141,13 @@ class YouTubeQueryTool(BaseTool):
             for i in range(len(results["documents"][0])):
                 doc = results["documents"][0][i]
                 metadata = results["metadatas"][0][i]
-                summaries.append(f"Video Title: {metadata.get('title', 'N/A')}\nTranscript excerpt: {doc[:1000].strip()}...\nURL: {metadata.get('url', 'N/A')}")
+                summaries.append(f"From '{metadata.get('title', 'Expert Video')}': {doc[:800].strip()}...")
 
-            return "\n\n---\n\n".join(summaries)
+            return "\n\n".join(summaries)
 
         except Exception as e:
             logger.error(f"YouTube query failed: {e}")
-            return f"Error searching for '{query}'."
+            return f"Error searching for birdwatching advice about '{query}'."
 
 class BirdQAAgent:
     """Agent for answering bird-related questions using tools and LLM."""
@@ -123,26 +159,28 @@ class BirdQAAgent:
             temperature=Config.TEMPERATURE,
             openai_api_key=Config.OPENAI_API_KEY
         )
-        self.tools = [
-            BirdQueryTool(chroma_client=self.chroma_client),
-            YouTubeQueryTool(chroma_client=self.chroma_client)
-        ]
+        
+        # Initialize tools with references we can access later
+        self.bird_tool = BirdQueryTool(chroma_client=self.chroma_client)
+        self.youtube_tool = YouTubeQueryTool(chroma_client=self.chroma_client)
+        self.tools = [self.bird_tool, self.youtube_tool]
 
         agent_system_prompt = """
-            You are a helpful and friendly AI assistant who is an expert on all things birds. You are a conversational and engaging parrot.
+You are a helpful and friendly AI assistant who is an expert on all things birds. You are a conversational and engaging parrot.
 
-            You have access to the following tools: {tools}
+You have access to the following tools: {tools}
 
-            **Your only purpose is to answer questions about birds.**
+**Your only purpose is to answer questions about birds.**
 
-            **Instructions:**
-            - **Only use your tools when the user's query is directly about birds or bird-related topics.**
-            - For any other conversation, including greetings, small talk, or off-topic questions, respond directly and conversationally without using any tools.
-            - When using the `bird_query` tool, carefully analyze the results. If a bird is found, provide a friendly and concise answer using the provided information. If multiple birds are found, you may mention the most relevant one and suggest the user can ask for more details on the others.
-            - **NEVER** include links, image refrences, or audio refrences in your final response. The frontend will handle those automatically.
-            - If a tool search for a bird yields "No Match Found," inform the user and ask if they would like to know about a different bird or a more general topic.
-            - Always provide your final answer in a friendly, conversational tone. Do not mention any tools or databases in your final response.
-            """.format(tools=[tool.name + ": " + tool.description for tool in self.tools])
+**Instructions:**
+- **Use your tools when the user's query is directly about a bird species or bird-related topics.**
+- For any other conversation, including greetings, small talk, or off-topic questions, respond directly and conversationally without using any tools, but try to get back on the topic of birds.
+- When using the bird_query tool, use the information it provides to give a friendly, knowledgeable response about the bird.
+- If the tool indicates no information was found, you can offer general knowledge but state it's from your general knowledge.
+- For birdwatching advice, use the youtube_query tool.
+- Always provide your final answer in a friendly, conversational tone. Do not mention tools or databases unless a search explicitly failed.
+- Focus on being helpful and engaging while sharing bird knowledge.
+        """.format(tools=[f"{tool.name}: {tool.description}" for tool in self.tools])
 
         self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         self.agent_executor = initialize_agent(
@@ -151,27 +189,8 @@ class BirdQAAgent:
             agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
             verbose=True,
             memory=self.memory,
-            return_intermediate_steps=True,
+            return_intermediate_steps=False,  # We don't need these anymore
             agent_kwargs={"system_message": agent_system_prompt}
-        )
-
-        self.response_chain = LLMChain(
-            llm=self.llm,
-            prompt=PromptTemplate(
-                input_variables=["species", "description", "audio_present"],
-                template="""
-                Based on the following bird information, provide a friendly and conversational response.
-                
-                Species: {species}
-                Description: {description}
-                Audio present: {audio_present}
-                
-                Remember to act as a friendly and engaging parrot. Do not mention any tools or databases.
-                NEVER include links, image references, or audio references. The frontend will handle those.
-                
-                Your final response:
-                """
-            )
         )
 
     def clear_memory(self):
@@ -186,49 +205,24 @@ class BirdQAAgent:
     def ask(self, user_query: str) -> Dict[str, Any]:
         """Ask the agent a question and get a structured response."""
         try:
+            self.bird_tool.clear_stored_metadata()
+            
             response = self.agent_executor.invoke({"input": user_query})
-            intermediate_steps = response.get("intermediate_steps", [])
-            
-            found_birds = []
             final_response = response.get("output", "I'm sorry, I couldn't find an answer.")
-
-            # Look for a bird_query observation
-            for action, observation in intermediate_steps:
-                if action.tool == "bird_query":
-                    try:
-                        bird_data_list = json.loads(observation)
-                        
-                        if bird_data_list and bird_data_list[0].get("species") != "No Match Found":
-                            found_birds = bird_data_list
-                            first_bird = bird_data_list[0]
-                            audio_present = "yes" if first_bird.get("audio_url") else "no"
-                            
-                            # Use the new chain to generate a clean, bird-specific response
-                            response_from_chain = self.response_chain.invoke(
-                                {
-                                    "species": first_bird["species"],
-                                    "description": first_bird["description"],
-                                    "audio_present": audio_present,
-                                }
-                            )
-                            # Correctly extract the string output from the dictionary response
-                            final_response = response_from_chain.get("text", "") 
-                            
-                            break
-                        else:
-                            # Handle "No Match Found" explicitly
-                            final_response = response.get("output", "I'm sorry, I couldn't find a bird that matched your description. Would you like to try a different one?")
-                            break
-                    except (json.JSONDecodeError, KeyError) as e:
-                        logger.warning(f"Failed to parse bird data or key not found: {observation} - {e}")
-                        final_response = "Woops, something went wrong while I was looking that up. My apologies!"
-                        break
-
-            final_response_clean = strip_markdown_links(final_response)
             
+            found_birds = self.bird_tool.get_stored_metadata()
+            
+            birds_for_frontend = []
+            for bird_meta in found_birds:
+                birds_for_frontend.append({
+                    "species": bird_meta["species"],
+                    "image_url": bird_meta["image_url"],
+                    "audio_url": bird_meta["audio_url"]
+                })
+
             return {
-                "response": final_response_clean,
-                "birds": found_birds,
+                "response": strip_markdown_links(final_response),
+                "birds": birds_for_frontend,
                 "error": False,
             }
         
@@ -241,28 +235,23 @@ class BirdQAAgent:
             }
 
     def process_audio_bytes(self, audio_bytes: bytes, filename: str) -> Dict[str, Any]:
-        """
-        Process audio bytes using OpenAI Whisper and return the transcription.
-        Args:
-            audio_bytes: Raw audio bytes.
-            filename: Name of the audio file (for logging).
-        Returns:
-            Dictionary with transcription and optional metadata.
-        """
+        """Process audio bytes using OpenAI Whisper and return the transcription."""
         try:
             logger.info(f"Processing audio file: {filename}")
             temp_path = "temp_audio.mp3"
             with open(temp_path, "wb") as f:
                 f.write(audio_bytes)
-            logger.info(f"Saved temporary audio file: {temp_path}")
+            
             client = OpenAI(api_key=Config.OPENAI_API_KEY)
             with open(temp_path, "rb") as audio_file:
                 transcription = client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio_file
                 )
+            
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+                
             return {
                 "transcription": transcription.text,
                 "error": False

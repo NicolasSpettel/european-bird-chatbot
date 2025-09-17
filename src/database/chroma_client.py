@@ -1,6 +1,5 @@
 # File: src/database/chroma_client.py
 
-import sys
 import os
 import logging
 import chromadb
@@ -11,8 +10,9 @@ from src.config import Config
 logger = logging.getLogger(__name__)
 
 class ChromaClient:
+    """ChromaDB client with custom fine-tuned embedding model for bird knowledge retrieval."""
+    
     def __init__(self):
-
         try:
             self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name=Config.FINE_TUNED_MODEL_PATH
@@ -22,7 +22,6 @@ class ChromaClient:
             logger.error(f"Failed to load fine-tuned embedding model: {e}")
             raise RuntimeError("Exiting due to failed model load.")
 
-        # Initialize the ChromaDB client with persistent storage
         db_path = "./data/chroma_db"
         os.makedirs(db_path, exist_ok=True)
         self.client = chromadb.PersistentClient(
@@ -53,7 +52,7 @@ class ChromaClient:
             logger.warning(f"Failed to delete collection '{collection_name}': {e}")
 
     def add_data(self, collection_name: str, documents: list, metadata: list, ids: list):
-        """Add data to specified collection"""
+        """Add data to specified collection."""
         try:
             collection = self.get_or_create_collection(collection_name)
             collection.add(documents=documents, metadatas=metadata, ids=ids)
@@ -63,7 +62,7 @@ class ChromaClient:
             raise
 
     def search(self, collection_name: str, query: str, n_results: int = 2):
-        """Search in specified collection"""
+        """Search in specified collection."""
         try:
             collection = self.get_or_create_collection(collection_name)
             results = collection.query(

@@ -1,16 +1,12 @@
 # File: src/database/populate_db.py
 
-import sys
 import os
 import json
 import re
 from pathlib import Path
 from src.database.chroma_client import ChromaClient
-from src.config import Config
 import logging
 
-# Ensure project root is in path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -18,7 +14,6 @@ def extract_characteristics(text):
     """Extract bird characteristics for better descriptive search."""
     characteristics = []
     
-    # Size indicators
     size_patterns = [
         (r'\b(small|tiny|little)\b', 'small'),
         (r'\b(medium|moderate)\b', 'medium'),
@@ -27,7 +22,6 @@ def extract_characteristics(text):
         (r'\b(\d+)\s*mm\b', 'size')
     ]
     
-    # Color patterns
     color_patterns = [
         (r'\b(black|dark)\b', 'black'),
         (r'\b(white|pale)\b', 'white'),
@@ -42,7 +36,6 @@ def extract_characteristics(text):
         (r'\b(striped|streaked|barred)\b', 'striped')
     ]
     
-    # Body part patterns
     body_patterns = [
         (r'\b(long|short|pointed|curved|thick|thin|slender)\s+(bill|beak)\b', 'beak'),
         (r'\b(long|short|pointed|square|forked)\s+tail\b', 'tail'),
@@ -52,7 +45,6 @@ def extract_characteristics(text):
         (r'\b(breast|chest|belly|throat|head|back|rump)\b', 'bodypart')
     ]
     
-    # Habitat patterns
     habitat_patterns = [
         (r'\b(woodland|forest|trees)\b', 'woodland'),
         (r'\b(water|wetland|marsh|pond|lake|river)\b', 'water'),
@@ -62,7 +54,6 @@ def extract_characteristics(text):
         (r'\b(mountain|hill|upland)\b', 'upland')
     ]
     
-    # Behavior patterns
     behavior_patterns = [
         (r'\b(ground|earth|floor)\b.*\b(feed|forage|search)\b', 'ground_feeder'),
         (r'\b(fly|flight|soar|glide)\b', 'flight'),
@@ -73,7 +64,6 @@ def extract_characteristics(text):
     
     text_lower = text.lower()
     
-    # Extract all patterns
     all_patterns = [
         (size_patterns, 'size'),
         (color_patterns, 'color'),
@@ -88,26 +78,28 @@ def extract_characteristics(text):
             if matches:
                 characteristics.extend([f"{category}:{trait}" for _ in matches])
     
-    return list(set(characteristics))  # Remove duplicates
+    return list(set(characteristics))
 
 def create_searchable_document(bird_data):
     """Create an enhanced document optimized for descriptive search."""
     title = bird_data.get('title', '')
     extract = bird_data.get('extract', '')
     description = bird_data.get('description', '')
-    
-    # Combine all text
-    full_text = f"{title}\n{description}\n{extract}"
-    
-    # Extract characteristics
+    original_search = bird_data.get('original_search', title)
+
+    primary_name = original_search if original_search else title
+    full_text = f"{primary_name}\n{description}\n{extract}"
     characteristics = extract_characteristics(full_text)
-    
-    # Create a characteristics summary
     char_summary = " ".join(characteristics)
     
-    # Build the enhanced document with multiple search targets
+    search_traits = [primary_name.lower()]
+    search_traits.extend([c.split(':')[1] for c in characteristics if c.startswith('color:')])
+    search_traits.extend([c.split(':')[1] for c in characteristics if c.startswith('habitat:')])
+    search_traits.extend([c.split(':')[1] for c in characteristics if c.startswith('anatomy:')])
+    search_traits.extend([c.split(':')[1] for c in characteristics if c.startswith('behavior:')])
+
     enhanced_doc = f"""
-SPECIES: {title}
+SPECIES: {primary_name}
 
 PHYSICAL_DESCRIPTION: {description}
 
@@ -115,19 +107,7 @@ CHARACTERISTICS: {char_summary}
 
 DETAILED_INFO: {extract}
 
-SEARCHABLE_TRAITS: {' '.join([
-    # Add common search terms
-    'european bird',
-    title.lower(),
-    # Add size approximations
-    'small bird' if any('small' in c for c in characteristics) else '',
-    'medium bird' if any('medium' in c for c in characteristics) else '',
-    'large bird' if any('large' in c for c in characteristics) else '',
-    # Add color combinations
-    ' '.join([c.split(':')[1] for c in characteristics if c.startswith('color:')]),
-    # Add habitat info
-    ' '.join([c.split(':')[1] for c in characteristics if c.startswith('habitat:')]),
-])}
+SEARCHABLE_TRAITS: {' '.join(search_traits)}
 """.strip()
     
     return enhanced_doc, characteristics
@@ -142,9 +122,10 @@ def process_wikipedia_data(bird_data, doc_id):
         return None, None, None
 
     enhanced_doc, characteristics = create_searchable_document(bird_data)
-    
+    primary_title = bird_data.get('original_search', bird_data.get('title', ''))
+
     metadata = {
-        'species': str(bird_data.get('title', '')),
+        'title': str(primary_title),
         'family': "Unknown",
         'region': 'Europe',
         'source': 'Wikipedia',
@@ -166,7 +147,6 @@ def process_youtube_data(video_data, doc_id):
         return None, None, None
 
     doc_text = video_data.get('transcript')
-
     if not doc_text or len(doc_text) < 100:
         return None, None, None
 
@@ -179,19 +159,17 @@ def process_youtube_data(video_data, doc_id):
         'video_id': video_data.get('video_id', '')
     }
     
-    doc_id_final = f"youtube_{doc_id:03d}"
-    
-    return doc_text, metadata, doc_id_final
+    return doc_text, metadata, f"youtube_{doc_id:03d}"
 
 def load_combined_data():
-    """Load combined Wikipedia and YouTube data"""
-    data_file = Path(os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "data", "raw", "combined_data.json"
-    ))
+    """Load combined Wikipedia and YouTube data."""
+    project_root = Path(__file__).resolve().parent.parent.parent
+    data_file = project_root / "data" / "raw" / "combined_data.json"
+    
     if not data_file.exists():
         logger.error(f"Combined data file not found at {data_file}. Run data collection first.")
         return []
+    
     with open(data_file, 'r', encoding='utf-8') as f:
         all_data = json.load(f)
     return all_data
@@ -216,8 +194,6 @@ def populate_chromadb():
     characteristics_stats = {}
     
     for item in all_data:
-        logger.info(f"Processing item with type: {item.get('type')}")
-
         if item.get('type') == 'wikipedia_bird_full':
             doc_text, metadata, doc_id = process_wikipedia_data(item, bird_counter)
             if doc_text:

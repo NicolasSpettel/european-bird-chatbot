@@ -9,7 +9,6 @@ from src.data.collectors.youtube_collector import YouTubeTranscriptCollector
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Correctly find the project root for file paths ---
 current_dir = Path(__file__).resolve().parent
 PROJECT_ROOT = current_dir.parent.parent.parent
 
@@ -21,7 +20,6 @@ def get_european_bird_list(file_path: Path) -> list:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith('#'):
-                    # Split the line by comma and then clean each name
                     names_on_line = line.split(',')
                     for name in names_on_line:
                         name = name.strip()
@@ -36,17 +34,12 @@ def get_european_bird_list(file_path: Path) -> list:
     return bird_list
 
 def collect_and_save_bird_data():
-    """
-    Collects comprehensive bird data for a predefined list of European birds
-    and saves it to a JSON file.
-    """
+    """Collects comprehensive bird data for a predefined list of European birds and saves it to a JSON file."""
     logger.info("Starting bird data collection.")
 
-    # Use the pre-calculated PROJECT_ROOT to find the files
     bird_list_path = PROJECT_ROOT / 'docs' / 'list_of_birds.txt'
     output_path = PROJECT_ROOT / 'data' / 'raw' / 'combined_data.json'
 
-    # Initialize collectors
     bird_collector = ComprehensiveBirdCollector()
     youtube_collector = YouTubeTranscriptCollector()
 
@@ -57,7 +50,6 @@ def collect_and_save_bird_data():
 
     all_bird_data = []
 
-    # --- Step 1: Collect Wikipedia Data ---
     logger.info("Collecting Wikipedia and audio data...")
     for name in bird_names:
         logger.info(f"Collecting data for {name}...")
@@ -73,10 +65,8 @@ def collect_and_save_bird_data():
 
     logger.info(f"Finished collecting data for {len(all_bird_data)} birds from Wikipedia.")
     
-    # --- Step 2: Collect YouTube Data ---
     logger.info("Collecting YouTube video data...")
     
-    # List of YouTube URLs to collect transcripts from.
     youtube_urls = [
         "https://www.youtube.com/watch?v=DSIhFy6tlvI",
         "https://www.youtube.com/watch?v=NW9MVJmoRqQ",
@@ -99,8 +89,8 @@ def collect_and_save_bird_data():
             
     logger.info(f"Finished collecting YouTube video data.")
 
-    # --- Step 3: Save all collected data ---
     try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(all_bird_data, f, indent=4)
         logger.info(f"Successfully saved combined data to {output_path}")
