@@ -48,6 +48,7 @@ logs/
 Thumbs.db
 
 # Project specific
+/images
 /final_venv
 /fine_tuned_model
 data/raw/
