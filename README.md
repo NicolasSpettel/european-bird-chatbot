@@ -1,5 +1,6 @@
 # European Bird AI Assistant 🦜
 An intelligent, conversational AI assistant specializing in European birds. This project leverages a multi-tool agentic architecture to provide users with detailed bird information, visual aids, and auditory samples.
+Presentation link: https://docs.google.com/presentation/d/1T6uYEX4yAFgKWyVu-DLxXJyrlY9KuG7dqSyW540P2L0/edit?slide=id.g3807a635d55_0_24#slide=id.g3807a635d55_0_24
 
 # ✨ Features
 Intelligent Q&A: Ask about specific birds ("What does a European Robin look like?") or general birdwatching tips ("How do I get started with birding?").
@@ -63,6 +64,7 @@ Launch an instance on AWS and deploy the container.
 
 # 📈 Evaluation
 Project performance was tracked using LangSmith, focusing on key metrics like latency and tool-use accuracy. While we observed positive results in real-world testing, the evaluation bot's scores highlighted the difficulty in automatically assessing the quality of conversational AI, where engagement and tone are as important as factual correctness.
+
 
 
 
