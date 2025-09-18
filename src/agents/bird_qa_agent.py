@@ -85,12 +85,10 @@ class BirdQueryTool(BaseTool):
             if not clean_descriptions:
                 return f"No detailed information found for '{cleaned_query}'."
             
-            # ✨ New logic to return a more definitive, non-negotiable tool output
             bird = clean_descriptions[0]
             if len(clean_descriptions) == 1:
                 return f"The database search found information for the following bird: {bird['species']}. Description: {bird['description']}"
             else:
-                 # If multiple results, provide a clear ranking or summary
                 result_text = f"The database search found a few birds that match. The top result is {bird['species']}. Description: {bird['description'][:200]}... Other birds found are:\n"
                 for other_bird in clean_descriptions[1:]:
                      result_text += f"- {other_bird['species']}: {other_bird['description'][:100]}...\n"
@@ -137,7 +135,7 @@ class YouTubeQueryTool(BaseTool):
             for i in range(len(results["documents"][0])):
                 doc = results["documents"][0][i]
                 metadata = results["metadatas"][0][i]
-                summaries.append(f"From '{metadata.get('title', 'Expert Video')}': {doc[:800].strip()}...")
+                summaries.append(f"From '{metadata.get('title', 'Expert Video')}': {doc[:1000].strip()}...")
 
             return "\n\n".join(summaries)
 
@@ -161,7 +159,7 @@ class BirdQAAgent:
         self.tools = [self.bird_tool, self.youtube_tool]
 
         agent_system_prompt = """
-You are an expert AI assistant (embodied as a smart parrot) specializing in all things related to European birds. Your knowledge and purpose are strictly limited to providing information on this topic.
+You are an expert AI assistant (embodied as a smart parrot called Apollo, thats your name) specializing in all things related to European birds. Your knowledge and purpose are strictly limited to providing information on this topic.
 
 Primary Directives:
 
@@ -173,24 +171,22 @@ If the tool provides information about a specific bird, construct a comprehensiv
 
 If the results are not a perfect match or don't provide a complete answer (e.g., a general question like "do birds get hungry?"), still acknowledge the search. You should then use your broader knowledge to provide a general answer to the user's question, mentioning that the tool found related but not directly relevant information. The goal is to always use the tool and then reason about its output.
 
+If the query is light conversation (e.g. "how are you", "birds are cool"), respond in a friendly manner but always steer the conversation back to birds. For example, "I'm doing great! Did you know that European robins are known for their beautiful songs?"
+
 If the query is NOT about birds or any bird-related topic (e.g., "What is the weather?"), you must politely decline to answer. Your response must be: "I'm sorry, but my knowledge is focused on European birds. Please ask me a question about birds!" This is your final, mandatory fallback for truly out-of-scope queries.
+
+Always formulate your answer as Apollo, the friendly, bird expert, parrot.
 """
 
         self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         self.agent_executor = initialize_agent(
             tools=self.tools,
             llm=self.llm,
-            # Change AgentType to use OpenAI's native tool calling
             agent=AgentType.OPENAI_FUNCTIONS,
             verbose=True,
             memory=self.memory,
             return_intermediate_steps=False,
-            # The tool-calling agent is more robust and less prone to parsing errors,
-            # so `handle_parsing_errors=True` is not strictly needed but can be kept
-            # for an extra layer of safety.
             handle_parsing_errors=True,
-            # Remove `agent_kwargs` with `format_instructions`
-            # as the tool-calling agent doesn't need them.
             agent_kwargs={"system_message": agent_system_prompt}
         )
 

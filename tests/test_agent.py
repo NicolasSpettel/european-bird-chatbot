@@ -21,21 +21,7 @@ def test_bird_agent():
         
         # Test questions
         test_questions = [
-            "What's the most common bird in Europe?",
-            "Tell me about migratory birds in Europe.",
-            "What bird has a red chest and is often seen in gardens?",
-            "Which European birds are known for their unique songs or calls?",
-            "What's the difference between a crow and a raven?",
-            "What does the Eurasian Jay look like?",
-            "What does the Eurasian Jay eat?",
-            "How does the Eurasian Jay's behavior change throughout the seasons?",
-            "Where can I typically find the Eurasian Jay in Europe?",
-            "Can the Eurasian Jay mimic other birds or sounds?",
-            "What's the best time of day to go birdwatching?",
-            "What kind of binoculars should I buy for a beginner?",
-            "Can you recommend a good European dish?",
-            "What are the best hiking trails in the Dolomites?",
-            "How does a jet engine work?"
+            "tell me something about storcks, what do the eat?"
         ]
         
         print("\nTesting agent with questions:")
