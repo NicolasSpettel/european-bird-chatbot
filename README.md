@@ -40,14 +40,23 @@ Xeno-Canto: A repository for bird sounds, used to source the audio clips.
 YouTube API: Provided transcripts of birdwatching tutorials and guides.
 
 # 🚀 Getting Started
-The application is containerized with Docker for easy deployment.
-
 Prerequisites
-Docker
 
-AWS account (for deployment)
+Before you begin, ensure you have the following software installed on your machine:
 
-Deployment
+Docker: Used to build and run the application in a containerized environment.
+
+AWS CLI: (Optional) If you plan to deploy to AWS, you'll need the AWS Command Line Interface configured.
+
+Python: The project is written in Python. Ensure you have a recent version (3.8+) installed.
+
+You will also need to acquire the following API keys and set them as environment variables:
+
+OPENAI_API_KEY: For gpt-4o-mini and the Whisper API.
+
+HUGGINGFACEHUB_API_TOKEN: For accessing the all-MiniLM-L6-v2 fine-tuned model here: https://huggingface.co/Nicolas-Spettel/bird-qa-model.
+
+We recommend using a .env file to manage these secrets securely.
 
 Clone the repository:
 
@@ -55,10 +64,24 @@ Clone the repository:
 git clone https://github.com/NicolasSpettel/european-bird-chatbot.git
 cd european-bird-chatbot
 ```
-Build the Docker image:
+Run the data collector:
+
+```
+python -m src.data.collectors.collect_all_data
+```
+Populate the database:
+
+```
+python -m src.database.populate_db
+```
+Build the Docker Image:
 
 ```
 docker build -t bird-chatbot .
+```
+Run the Container:
+```
+docker run -p 8000:8000 bird-chatbot
 ```
 Push the image to your container registry (e.g., AWS ECR).
 
@@ -66,6 +89,7 @@ Launch an instance on AWS and deploy the container.
 
 # 📈 Evaluation
 Project performance was tracked using LangSmith(https://smith.langchain.com/public/15e7f59c-7fd9-4d8c-a178-98ae49f61718/d), focusing on key metrics like latency and tool-use accuracy. While we observed positive results in real-world testing, the evaluation bot's scores highlighted the difficulty in automatically assessing the quality of conversational AI, where engagement and tone are as important as factual correctness.
+
 
 
 
