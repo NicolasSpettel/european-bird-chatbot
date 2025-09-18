@@ -48,15 +48,20 @@ AWS account (for deployment)
 Deployment
 Clone the repository:
 
-´´´git clone [your-repo-url]
-cd [your-repo-folder]´´´
+´´´
+git clone [your-repo-url]
+cd [your-repo-folder]
+´´´
 Build the Docker image:
 
-´´´docker build -t bird-ai-assistant .´´´
+´´´
+docker build -t bird-ai-assistant .
+´´´
 Push the image to your container registry (e.g., AWS ECR).
 
 Launch an instance on AWS and deploy the container.
 
 📈 # Evaluation
 Project performance was tracked using LangSmith, focusing on key metrics like latency and tool-use accuracy. While we observed positive results in real-world testing, the evaluation bot's scores highlighted the difficulty in automatically assessing the quality of conversational AI, where engagement and tone are as important as factual correctness.
+
 
