@@ -48,6 +48,7 @@ Docker
 AWS account (for deployment)
 
 Deployment
+
 Clone the repository:
 
 ```
@@ -65,6 +66,7 @@ Launch an instance on AWS and deploy the container.
 
 # 📈 Evaluation
 Project performance was tracked using LangSmith(https://smith.langchain.com/public/15e7f59c-7fd9-4d8c-a178-98ae49f61718/d), focusing on key metrics like latency and tool-use accuracy. While we observed positive results in real-world testing, the evaluation bot's scores highlighted the difficulty in automatically assessing the quality of conversational AI, where engagement and tone are as important as factual correctness.
+
 
 
 
